@@ -1,29 +1,29 @@
 # Support
 
-Welcome to the BitBLAS support page! BitBLAS is a cutting-edge framework designed for generating high-performance CUDA/HIP code for BLAS operators. Whether you're working on projects like BitNet, GPTQ, or similar, BitBLAS is here to accelerate your development with its robust features.
+Welcome to the TileLang support page! TileLang extends Apache TVM with a more accessible approach to writing high-performance GPU kernels. It currently supports CUDA targets including Ampere (sm_80+), Turing (sm_75), and Volta (sm_70) architectures. Whether you are working on common operators like GEMM and convolution or more advanced features like flash attention, TileLang aims to provide a more streamlined development experience while maintaining performance on par with hand-optimized implementations.
 
-## How to File Issues and Get Help
+## How to Report Issues and Request Features
 
-### Reporting Bugs or Requesting Features
+### Bug Reports and Feature Requests
 
-If you encounter a bug or have a feature request, we encourage you to file an issue through our GitHub Issues page. Please follow these steps:
+We encourage you to use our GitHub Issues page to report any bugs or request new features:
+	1.	Search Existing Issues: Before filing a new issue, please check if a similar one already exists.
+	2.	File a New Issue: If you don’t find a matching entry, open a new issue and include as many details as possible—such as environment info, steps to reproduce, and the output logs. This will help us quickly understand and address your problem.
 
-1. **Search Existing Issues**: Before creating a new issue, please search the existing ones to avoid duplicates.
-2. **Create a New Issue**: If your issue is new, go ahead and file it as a new issue. Provide as much detail as possible to help us understand and address it efficiently.
+### Getting Help and Asking Questions
 
-### Seeking Help and Questions
-
-For questions and help with using BitBLAS, we offer the following channels:
-
-- **GitHub Discussions**: For community support, sharing ideas, and discussing best practices, please visit our [GitHub Discussions](https://github.com/YOUR_REPO/discussions).
-- **Stack Overflow**: Use the tag `BitBLAS` when posting questions. This is monitored by our team and the community.
+If you have questions about using TileLang, best practices, or performance tuning, there are several ways to get support:
+	•	GitHub Discussions: Join the community at TileLang Discussions to ask questions, share ideas, and discuss development strategies.
+	•	Stack Overflow: Use the TileLang tag when asking questions. The project maintainers and community members regularly check the tag and can offer assistance.
 
 ## Microsoft Support Policy
 
-Support for BitBLAS is primarily provided through the above-mentioned community channels. We strive to address issues and questions in a timely manner, leveraging the collective knowledge and experience of the BitBLAS community.
+This project is open-source and community-driven. Primary support channels are the community forums and issue tracker mentioned above. While maintainers and contributors strive to respond promptly, we rely on community engagement to help address questions and improve the codebase.
 
-## Contributing to BitBLAS
+## Contributing to TileLang
 
-We warmly welcome contributions to the BitBLAS project. Whether it's improving the documentation, adding new features, or fixing bugs, your contributions are invaluable to us. Please refer to our [CONTRIBUTING.md](./CONTRIBUTING.md) file for more details on how to contribute.
+We encourage contributions from anyone interested in improving TileLang. Contributions can range from code enhancements and feature implementations to documentation improvements and bug fixes. If you’re interested in contributing, please refer to our CONTRIBUTING.md file for guidelines, including the process for signing the Contributor License Agreement (CLA), which you only need to complete once.
 
-Before submitting a pull request, you may need to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us the rights to use your contribution. The CLA process is straightforward and only needs to be completed once.
+Your involvement helps shape TileLang’s future, ensuring it remains a versatile and high-performance tool for GPU kernel development.
+
+This revised support page contextualizes the assistance and community channels around TileLang, while ensuring it is distinct from the original README and the previously provided content.
