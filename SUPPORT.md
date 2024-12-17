@@ -1,25 +1,29 @@
-# TODO: The maintainer of this repo has not yet edited this file
-
-**REPO OWNER**: Do you want Customer Service & Support (CSS) support for this product/project?
-
-- **No CSS support:** Fill out this template with information about how to file issues and get help.
-- **Yes CSS support:** Fill out an intake form at [aka.ms/onboardsupport](https://aka.ms/onboardsupport). CSS will work with/help you to determine next steps.
-- **Not sure?** Fill out an intake as though the answer were "Yes". CSS will help you decide.
-
-*Then remove this first heading from this SUPPORT.MD file before publishing your repo.*
-
 # Support
 
-## How to file issues and get help  
+Welcome to the TileLang support page! TileLang extends Apache TVM with a more accessible approach to writing high-performance GPU kernels. It currently supports CUDA targets including Ampere (sm_80+), Turing (sm_75), and Volta (sm_70) architectures. Whether you are working on common operators like GEMM and convolution or more advanced features like flash attention, TileLang aims to provide a more streamlined development experience while maintaining performance on par with hand-optimized implementations.
 
-This project uses GitHub Issues to track bugs and feature requests. Please search the existing 
-issues before filing new issues to avoid duplicates.  For new issues, file your bug or 
-feature request as a new Issue.
+## How to Report Issues and Request Features
 
-For help and questions about using this project, please **REPO MAINTAINER: INSERT INSTRUCTIONS HERE 
-FOR HOW TO ENGAGE REPO OWNERS OR COMMUNITY FOR HELP. COULD BE A STACK OVERFLOW TAG OR OTHER
-CHANNEL. WHERE WILL YOU HELP PEOPLE?**.
+### Bug Reports and Feature Requests
 
-## Microsoft Support Policy  
+We encourage you to use our GitHub Issues page to report any bugs or request new features:
+	1.	Search Existing Issues: Before filing a new issue, please check if a similar one already exists.
+	2.	File a New Issue: If you don’t find a matching entry, open a new issue and include as many details as possible—such as environment info, steps to reproduce, and the output logs. This will help us quickly understand and address your problem.
 
-Support for this **PROJECT or PRODUCT** is limited to the resources listed above.
+### Getting Help and Asking Questions
+
+If you have questions about using TileLang, best practices, or performance tuning, there are several ways to get support:
+	•	GitHub Discussions: Join the community at TileLang Discussions to ask questions, share ideas, and discuss development strategies.
+	•	Stack Overflow: Use the TileLang tag when asking questions. The project maintainers and community members regularly check the tag and can offer assistance.
+
+## Microsoft Support Policy
+
+This project is open-source and community-driven. Primary support channels are the community forums and issue tracker mentioned above. While maintainers and contributors strive to respond promptly, we rely on community engagement to help address questions and improve the codebase.
+
+## Contributing to TileLang
+
+We encourage contributions from anyone interested in improving TileLang. Contributions can range from code enhancements and feature implementations to documentation improvements and bug fixes. If you’re interested in contributing, please refer to our CONTRIBUTING.md file for guidelines, including the process for signing the Contributor License Agreement (CLA), which you only need to complete once.
+
+Your involvement helps shape TileLang’s future, ensuring it remains a versatile and high-performance tool for GPU kernel development.
+
+This revised support page contextualizes the assistance and community channels around TileLang, while ensuring it is distinct from the original README and the previously provided content.
