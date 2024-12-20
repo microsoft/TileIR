@@ -40,6 +40,7 @@ class TensorSupplyType(Enum):
 
 
 def get_tensor_supply(supply_type: TensorSupplyType):
+
     def get_tensor(tensor: TensorType) -> torch.Tensor:
         dtype = torch.__getattribute__(str(tensor.dtype))
         device = torch.cuda.current_device()
@@ -47,23 +48,17 @@ def get_tensor_supply(supply_type: TensorSupplyType):
         # torch.cuda.manual_seed(0)
         shape = list(map(int, tensor.shape))
         if dtype == torch.int8 and supply_type in [
-            TensorSupplyType.Uniform,
-            TensorSupplyType.Normal,
+                TensorSupplyType.Uniform,
+                TensorSupplyType.Normal,
         ]:
             return torch.ones(*shape, device=device, dtype=dtype)
 
         if supply_type == TensorSupplyType.Integer:
-            return torch.randint(
-                low=-2, high=3, size=shape, device=device, dtype=dtype
-            )
+            return torch.randint(low=-2, high=3, size=shape, device=device, dtype=dtype)
         elif supply_type == TensorSupplyType.Uniform:
-            return torch.empty(*shape, device=device, dtype=dtype).uniform_(
-                -1.0, 1.0
-            )
+            return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
         elif supply_type == TensorSupplyType.Normal:
-            return torch.empty(*shape, device=device, dtype=dtype).normal_(
-                -1.0, 1.0
-            )
+            return torch.empty(*shape, device=device, dtype=dtype).normal_(-1.0, 1.0)
         elif supply_type == TensorSupplyType.Randn:
             return torch.randn(*shape, device=device).to(dtype)
         elif supply_type == TensorSupplyType.Zero:
@@ -77,9 +72,8 @@ def get_tensor_supply(supply_type: TensorSupplyType):
 
 
 class ConvertTorch:
-    def __init__(
-        self, mod, params: List[TensorType], result_idx: List[int]
-    ) -> None:
+
+    def __init__(self, mod, params: List[TensorType], result_idx: List[int]) -> None:
         self.mod = mod
         self.params = params
         self.result_idx = result_idx
@@ -121,6 +115,7 @@ class ConvertTorch:
 
 
 class Profiler(ConvertTorch):
+
     def __init__(
         self,
         mod,
@@ -198,8 +193,7 @@ class Profiler(ConvertTorch):
         elif profiler == "tvm":
             ins = self._get_inputs(with_output=True)
             time_evaluator = self.mod.time_evaluator(
-                self.mod.entry_name, tvm.cuda(0), number=rep, repeat=n_repeat
-            )
+                self.mod.entry_name, tvm.cuda(0), number=rep, repeat=n_repeat)
             tvm_inputs = [ndarray.from_dlpack(to_dlpack(inp)) for inp in ins]
             # Transform Latency to ms
             return time_evaluator(*tvm_inputs).mean * 1e3
@@ -265,9 +259,7 @@ def do_bench(
         n_warmup = _n_warmup
     if _n_repeat > 0:
         n_repeat = _n_repeat
-    start_event = [
-        torch.cuda.Event(enable_timing=True) for i in range(n_repeat)
-    ]
+    start_event = [torch.cuda.Event(enable_timing=True) for i in range(n_repeat)]
     end_event = [torch.cuda.Event(enable_timing=True) for i in range(n_repeat)]
     # Warm-up
     for _ in range(n_warmup):
@@ -293,9 +285,7 @@ def do_bench(
         dtype=torch.float,
     )
     if quantiles is not None:
-        ret = torch.quantile(
-            times, torch.tensor(quantiles, dtype=torch.float)
-        ).tolist()
+        ret = torch.quantile(times, torch.tensor(quantiles, dtype=torch.float)).tolist()
         if len(ret) == 1:
             ret = ret[0]
         return ret

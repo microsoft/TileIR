@@ -25,6 +25,7 @@ from tqdm import tqdm
 
 
 class Autotuner:
+
     def __init__(
         self,
         fn: Callable,
@@ -73,9 +74,7 @@ class Autotuner:
         return self.run(*args, **kwds)
 
 
-def autotune(
-    configs: Any, keys: List[str], warmup: int = 25, rep: int = 100
-) -> Callable:
+def autotune(configs: Any, keys: List[str], warmup: int = 25, rep: int = 100) -> Callable:
     """
     Decorator for tl program
     """
@@ -103,9 +102,7 @@ def jit(
         def decorator(*args, **kwargs) -> float:
             nonlocal ref_latency_cache
             # Enabling Efficient Fusion
-            with tvm.transform.PassContext(
-                config={"tir.merge_static_smem": True}
-            ):
+            with tvm.transform.PassContext(config={"tir.merge_static_smem": True}):
                 mod, params = tl.lower(fn(*args, **kwargs))
 
             mod = tl.Profiler(mod, params, out_idx, supply_type)

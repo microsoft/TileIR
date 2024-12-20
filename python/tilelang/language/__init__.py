@@ -24,8 +24,8 @@ from tvm.script.ir_builder.tir.frame import TIRFrame
 from tvm._ffi import register_object
 from tilelang import (
     _ffi_api,
-    Layout, # noqa: F401
-    Fragment, # noqa: F401
+    Layout,  # noqa: F401
+    Fragment,  # noqa: F401
 )
 
 
@@ -86,13 +86,12 @@ def Pipelined(
     if group is None:
         group = []
     # type: ignore[attr-defined] # pylint: disable=no-member
-    return _ffi_api.Pipelined(
-        start, stop, num_stages, order, stage, sync, group
-    )
+    return _ffi_api.Pipelined(start, stop, num_stages, order, stage, sync, group)
 
 
 @register_object("tl.KernelLaunchFrame")
 class KernelLaunchFrame(TIRFrame):
+
     def __enter__(self) -> Union[Var, List[Var]]:  # type: ignore[override]
         # Frames: BlockIdx.x, BlockIdx.y, BlockIdx.z, ThreadIdx.x, ThreadIdx.y, ThreadIdx.z, Root Block
         super().__enter__()
@@ -145,18 +144,12 @@ def Kernel(
 
 
 def use_swizzle(panel_size: int, order: str = "row", enable: bool = True):
-    device_func = (
-        "rasterization2DRow" if order == "row" else "rasterization2DColumn"
-    )
-    return (
-        T.attr(
-            None,
-            "threadblock_swizzle_pattern",
-            f"tl::{device_func}<{panel_size}>",
-        )
-        if enable
-        else None
-    )
+    device_func = ("rasterization2DRow" if order == "row" else "rasterization2DColumn")
+    return (T.attr(
+        None,
+        "threadblock_swizzle_pattern",
+        f"tl::{device_func}<{panel_size}>",
+    ) if enable else None)
 
 
 def alloc_shared(shape, dtype, scope="shared.dyn"):
@@ -182,9 +175,7 @@ def import_source(source: str):
 
 def region(buffer: tir.BufferLoad, access_type: str, *args: tir.PrimExpr):
     access_type = {"r": 1, "w": 2, "rw": 3}[access_type]
-    return tir.call_intrin(
-        "handle", tir.op.Op.get("tl.region"), buffer, access_type, *args
-    )
+    return tir.call_intrin("handle", tir.op.Op.get("tl.region"), buffer, access_type, *args)
 
 
 def buffer_to_tile_region(buffer: tir.Buffer, access_type: str):
@@ -193,26 +184,21 @@ def buffer_to_tile_region(buffer: tir.Buffer, access_type: str):
     return region(T.BufferLoad(buffer, mins), access_type, *extents)
 
 
-def buffer_load_to_tile_region(
-    load: tir.BufferLoad, access_type: str, extents: List[tir.PrimExpr]
-):
+def buffer_load_to_tile_region(load: tir.BufferLoad, access_type: str, extents: List[tir.PrimExpr]):
     return region(load, access_type, *extents)
 
 
-def buffer_region_to_tile_region(
-    buffer_region: tir.BufferRegion, access_type: str
-):
+def buffer_region_to_tile_region(buffer_region: tir.BufferRegion, access_type: str):
     mins = [x.min for x in buffer_region.region]
     extents = [x.extent for x in buffer_region.region]
-    return region(
-        T.BufferLoad(buffer_region.buffer, mins), access_type, *extents
-    )
+    return region(T.BufferLoad(buffer_region.buffer, mins), access_type, *extents)
 
 
 def copy(
     src: Union[tir.Buffer, tir.BufferLoad, tir.BufferRegion],
     dst: Union[tir.Buffer, tir.BufferLoad],
 ):
+
     def get_extent(data):
         if isinstance(data, tir.Buffer):
             return data.shape
@@ -316,9 +302,7 @@ def clear(buffer: tir.Buffer):
     return fill(buffer, 0)
 
 
-def reduce(
-    buffer: tir.Buffer, out: tir.Buffer, reduce_type: str, dim: int, clear: bool
-):
+def reduce(buffer: tir.Buffer, out: tir.Buffer, reduce_type: str, dim: int, clear: bool):
     buffer = buffer.access_ptr("r")
     out = out.access_ptr("w")
     return tir.call_intrin(
@@ -332,9 +316,7 @@ def reduce(
     )
 
 
-def reduce_max(
-    buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True
-):
+def reduce_max(buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True):
     """Perform reduce max on input buffer, store the result to output buffer
 
     Parameters
@@ -354,9 +336,7 @@ def reduce_max(
     return reduce(buffer, out, "max", dim, clear)
 
 
-def reduce_min(
-    buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True
-):
+def reduce_min(buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True):
     return reduce(buffer, out, "min", dim, clear)
 
 
@@ -369,6 +349,4 @@ def atomic_add(dst, value):
 
 
 def atomic_addx2(dst, value):
-    return T.call_extern(
-        "handle", "atomicAddx2", T.address_of(dst), T.address_of(value)
-    )
+    return T.call_extern("handle", "atomicAddx2", T.address_of(dst), T.address_of(value))

@@ -2,8 +2,9 @@
 yapf==0.40.2
 toml==0.10.2
 tomli==2.0.1
-ruff==0.1.5
+ruff==0.6.5
 codespell==2.3.0
+clang-format==15.0.7
 
 cffi
 cpplint
@@ -30,4 +31,3 @@ thefuzz
 tabulate
 wheel
 setuptools
-auto-gptq

@@ -25,6 +25,7 @@ from tilelang import _ffi_api
 
 @tvm._ffi.register_object("tl.Layout")
 class Layout(Node):
+
     def __init__(self, shape, forward_fn):
         forward_vars = []
         for idx, size in enumerate(shape):
@@ -34,9 +35,7 @@ class Layout(Node):
         forward_index = forward_fn(*vars)
         if isinstance(forward_index, PrimExpr):
             forward_index = [forward_index]
-        self.__init_handle_by_constructor__(
-            _ffi_api.Layout, forward_vars, forward_index
-        )
+        self.__init_handle_by_constructor__(_ffi_api.Layout, forward_vars, forward_index)
 
     @property
     def index(self):
@@ -66,9 +65,7 @@ class Fragment(Layout):
         else:
             forward_index = None
         if replicate > 1:
-            thread_replicate = IterVar(
-                Range(0, replicate), Var("rep", "int32"), 0
-            )
+            thread_replicate = IterVar(Range(0, replicate), Var("rep", "int32"), 0)
             forward_thread = forward_thread_fn(*vars, thread_replicate.var)
         else:
             thread_replicate = None
