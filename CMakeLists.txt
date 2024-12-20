@@ -76,7 +76,30 @@ else()
 endif()
 
 
-tilelang_file_glob(GLOB_RECURSE TILE_LANG_SRCS src/*.cc)
+tilelang_file_glob(GLOB TILE_LANG_SRCS 
+    src/*.cc
+    src/layout/*.cc
+    src/transform/*.cc
+    src/op/*.cc
+    src/target/utils.cc    
+)
+
+if(USE_CUDA)
+tilelang_file_glob(GLOB TILE_LANG_CUDA_SRCS
+  src/target/codegen_cuda.cc
+  src/target/rt_mod_cuda.cc
+)
+list(APPEND TILE_LANG_SRCS ${TILE_LANG_CUDA_SRCS})
+endif(USE_CUDA)
+
+if(USE_ROCM)
+tilelang_file_glob(GLOB TILE_LANG_HIP_SRCS
+  src/target/codegen_hip.cc
+  src/target/rt_mod_hip.cc
+)
+list(APPEND TILE_LANG_SRCS ${TILE_LANG_HIP_SRCS})
+endif(USE_ROCM)
+
 message(STATUS "TILE_LANG_SRCS: ${TILE_LANG_SRCS}")
 add_library(tilelang_objs OBJECT ${TILE_LANG_SRCS})
 

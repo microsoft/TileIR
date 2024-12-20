@@ -67,13 +67,13 @@ For PartitionLoop(For op, Var thread_var, arith::Analyzer* analyzer, Fragment lo
     vars.push_back(var);
   }
   vars.push_back(thread_var);
-
   // create the substitute map, and the loop body
   Map<Var, PrimExpr> vmap;
   Stmt body = op;
   auto inv_loop = loop_layout->Inverse();
   auto indices = inv_loop->Forward(vars.Map([](const Var& v) { return PrimExpr(v); }));
   for (int i = 0; i < old_loop_depth; i++) {
+    ICHECK(body.as<For>().defined());
     For loop = body.as<For>().value();
     vmap.Set(loop->loop_var, indices[i]);
     body = loop->body;

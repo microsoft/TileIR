@@ -28,6 +28,7 @@ namespace tvm {
 namespace tl {
 
 bool TargetIsCuda(Target target) { return target->GetTargetDeviceType() == kDLCUDA; }
+bool TargetIsRocm(Target target) { return target->GetTargetDeviceType() == kDLROCM; }
 
 int GetArchInt(Target target) {
   auto s = target->GetAttr<String>("arch");
@@ -63,12 +64,35 @@ bool TargetIsHopper(Target target) {
   return arch >= 90;
 }
 
-bool TargetHasAsyncCopy(Target target) {
-  if (!TargetIsCuda(target)) return false;
-  int arch = GetArchInt(target);
-  return arch >= 80;
+bool TargetIsCDNA(Target target) {
+  if (!TargetIsRocm(target)) return false;
+  if (target->attrs.count("mcpu")) {
+    std::string mcpu = Downcast<String>(target->attrs.at("mcpu"));
+    // if mcpu start with "gfx9", it is CDNA
+    return mcpu.find("gfx9") == 0;
+  }
+  return false;
 }
 
+bool TargetHasAsyncCopy(Target target) {
+  if (TargetIsCuda(target)) {
+    int arch = GetArchInt(target);
+    return arch >= 80;
+  } else if (TargetIsCDNA(target)) {
+    if (target->attrs.count("mcpu")) {
+      std::string mcpu = Downcast<String>(target->attrs.at("mcpu"));
+      if (mcpu.rfind("gfx9", 0) == 0) {
+        int gfx_version = std::stoi(mcpu.substr(3, 2));
+        return gfx_version >= 94;
+      }
+      return false;
+    } else {
+      return false;
+    }
+  }
+
+  return false;
+}
 bool TargetHasLdmatrix(Target target) {
   if (!TargetIsCuda(target)) return false;
   int arch = GetArchInt(target);

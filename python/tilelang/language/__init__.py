@@ -14,22 +14,19 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""The language interface for tilelang programs."""
+"""The language interface for tl programs."""
 
-from typing import Union, List, Optional, Tuple
+from typing import Union, List, Optional, Tuple, Dict, Any
 from tvm import tir
 from tvm.script import tir as T
 from tvm.script.parser.tir import *
 from tvm.script.ir_builder.tir.frame import TIRFrame
 from tvm._ffi import register_object
-from tilelang import (
-    _ffi_api,
-    Layout,  # noqa: F401
-    Fragment,  # noqa: F401
-)
+from tilelang import _ffi_api
+from tilelang.layout import Layout, Fragment
 
 
-def Parallel(*extents: tir.PrimExpr):
+def Parallel(*extents: tir.PrimExpr, coalesced_width: Optional[int] = None):
     """Tools to construct nested parallel for loop.
        This can be used to create element-wise tensor expression.
 
@@ -43,18 +40,21 @@ def Parallel(*extents: tir.PrimExpr):
     res : frame.ForFrame
         The ForFrame.
     """
-    return _ffi_api.Parallel(extents)  # type: ignore[attr-defined] # pylint: disable=no-member
+    annotations: Dict[str, Any] = {}
+    if coalesced_width is not None:
+        annotations.update({"coalesced_width": coalesced_width})
+    return _ffi_api.Parallel(extents, annotations)  # type: ignore[attr-defined] # pylint: disable=no-member
 
 
 def Pipelined(
-    start: tir.PrimExpr,
-    stop: tir.PrimExpr = None,
-    num_stages: int = 0,
-    order: Optional[List[int]] = None,
-    stage: Optional[List[int]] = None,
-    sync: Optional[List[List[int]]] = None,
-    group: Optional[List[List[int]]] = None,
-):
+        start: tir.PrimExpr, 
+        stop: tir.PrimExpr = None, 
+        num_stages: int = 0, 
+        order: Optional[List[int]] = None, 
+        stage: Optional[List[int]] = None, 
+        sync: Optional[List[List[int]]] = None,
+        group: Optional[List[List[int]]] = None
+    ):
     """Tools to construct pipelined for loop.
 
     Parameters
@@ -91,7 +91,6 @@ def Pipelined(
 
 @register_object("tl.KernelLaunchFrame")
 class KernelLaunchFrame(TIRFrame):
-
     def __enter__(self) -> Union[Var, List[Var]]:  # type: ignore[override]
         # Frames: BlockIdx.x, BlockIdx.y, BlockIdx.z, ThreadIdx.x, ThreadIdx.y, ThreadIdx.z, Root Block
         super().__enter__()
@@ -100,11 +99,8 @@ class KernelLaunchFrame(TIRFrame):
         return [frame.iter_var.var for frame in self.frames[0:-4]]
 
 
-def Kernel(
-    *blocks: List[tir.PrimExpr],
-    threads: Union[int, List[int], Tuple] = 128,
-    prelude: Optional[str] = None,
-):
+def Kernel(*blocks: List[tir.PrimExpr], threads: Union[int, List[int], Tuple] = 128, 
+           prelude:Optional[str]=None):
     """Tools to quickly construct a GPU kernel launch frame.
 
     Parameters
@@ -116,7 +112,7 @@ def Kernel(
         Or a list of integers representing blockDim.(x|y|z)
         if the value is -1, we skip the threadIdx.x binding.
     prelude : str
-        The import c code of the kernel,
+        The import c code of the kernel, 
         will be injected before the generated kernel code.
     layout_annotation: Optional[Map[tir.Buffer, tir.IndexMap]]
         The layout annotation map, used to annotate the layout of the buffers.
@@ -126,7 +122,7 @@ def Kernel(
     res : Tuple[frame.LaunchThreadFrame]
         The result LaunchThreadFrame.
     """
-    attrs: dict = {}
+    attrs:dict = {}
 
     if isinstance(threads, int):
         threads = [threads, 1, 1]
@@ -144,12 +140,12 @@ def Kernel(
 
 
 def use_swizzle(panel_size: int, order: str = "row", enable: bool = True):
-    device_func = ("rasterization2DRow" if order == "row" else "rasterization2DColumn")
-    return (T.attr(
-        None,
-        "threadblock_swizzle_pattern",
-        f"tl::{device_func}<{panel_size}>",
-    ) if enable else None)
+    device_func = (
+        "rasterization2DRow" if order == "row" else "rasterization2DColumn"
+    )
+    return T.attr(
+        None, "threadblock_swizzle_pattern", f"tl::{device_func}<{panel_size}>"
+    ) if enable else None
 
 
 def alloc_shared(shape, dtype, scope="shared.dyn"):
@@ -169,8 +165,8 @@ def annotate_layout(layout_map):
     return T.block_attr({"layout_map": layout_map})
 
 
-def import_source(source: str):
-    return T.block_attr({"pragma_import_c": source})
+def import_source(source:Optional[str] = None):
+    return T.block_attr({"pragma_import_c": source}) if source is not None else None
 
 
 def region(buffer: tir.BufferLoad, access_type: str, *args: tir.PrimExpr):
@@ -197,8 +193,8 @@ def buffer_region_to_tile_region(buffer_region: tir.BufferRegion, access_type: s
 def copy(
     src: Union[tir.Buffer, tir.BufferLoad, tir.BufferRegion],
     dst: Union[tir.Buffer, tir.BufferLoad],
+    coalesced_width: Optional[int] = None,
 ):
-
     def get_extent(data):
         if isinstance(data, tir.Buffer):
             return data.shape
@@ -228,8 +224,10 @@ def copy(
 
     src = _to_region(src, "r")
     dst = _to_region(dst, "w")
-
-    return tir.call_intrin("handle", tir.op.Op.get("tl.copy"), src, dst)
+    if coalesced_width is not None:
+        return tir.call_intrin("handle", tir.op.Op.get("tl.copy"), src, dst, coalesced_width)
+    else:
+        return tir.call_intrin("handle", tir.op.Op.get("tl.copy"), src, dst)
 
 
 def c2d_im2col(
@@ -269,7 +267,13 @@ def gemm(
     transpose_A: bool = False,
     transpose_B: bool = False,
     policy: GemmWarpPolicy = GemmWarpPolicy.Square,
+    k_pack: int = 1,
 ):
+    '''
+    k_pack: int
+        The number of k dimension that is packed into a single warp.
+        please ref to mfma macro generator for the detail information.
+    '''
     M = C.shape[0]
     N = C.shape[1]
     K = A.shape[0] if transpose_A else A.shape[1]
@@ -290,6 +294,7 @@ def gemm(
         N,
         K,
         policy,
+        k_pack,
     )
 
 
@@ -306,13 +311,7 @@ def reduce(buffer: tir.Buffer, out: tir.Buffer, reduce_type: str, dim: int, clea
     buffer = buffer.access_ptr("r")
     out = out.access_ptr("w")
     return tir.call_intrin(
-        "handle",
-        tir.op.Op.get("tl.reduce"),
-        buffer,
-        out,
-        reduce_type,
-        dim,
-        clear,
+        "handle", tir.op.Op.get("tl.reduce"), buffer, out, reduce_type, dim, clear
     )
 
 
@@ -344,9 +343,17 @@ def reduce_sum(buffer: tir.Buffer, out: tir.Buffer, dim: int):
     return reduce(buffer, out, "sum", dim, True)
 
 
+def reduce_abssum(buffer: tir.Buffer, out: tir.Buffer, dim: int):
+    return reduce(buffer, out, "abssum", dim, True)
+
+
 def atomic_add(dst, value):
     return T.call_extern("handle", "atomicAdd", T.address_of(dst), value)
 
-
 def atomic_addx2(dst, value):
     return T.call_extern("handle", "atomicAddx2", T.address_of(dst), T.address_of(value))
+
+def dp4a(A, B, C):
+    return T.call_extern(
+        "handle", "DP4A", T.address_of(A), T.address_of(B), T.address_of(C)
+    )

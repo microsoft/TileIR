@@ -111,7 +111,6 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
     return block;
   }
 
-
   int CheckAndGetBufferRowSize(Buffer buffer) {
     CHECK(buffer->shape.size() >= 2)
         << "The dimension of Buffer \"" << buffer->name << "\" with shape " << buffer->shape
@@ -119,8 +118,6 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
 
     auto dim = buffer->shape.size();
     auto buffer_row_size = buffer->shape[dim - 1].as<IntImmNode>()->value;
-    // auto buffer_col_size = buffer->shape[dim - 2].as<IntImmNode>()->value;
-
     return buffer_row_size;
   }
 
@@ -137,11 +134,19 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
       BufferLoad load = Downcast<BufferLoad>(access_ptr_call->args[0]);
       Array<PrimExpr> indices = load->indices;
       Array<PrimExpr> shape = load->buffer->shape;
-      // TODO(lei): Can improve this by using a more general way to handle multi-dimension buffer
-      CHECK_EQ(indices.size(), 2) << "Currently only support 2D buffer";
-      CHECK_EQ(shape.size(), 2) << "Currently only support 2D buffer";
 
-      PrimExpr elem_offset = indices[0] * shape[1] + indices[1];
+      CHECK_EQ(indices.size(), shape.size())
+          << "Indices size and shape size must match for general N-dimensional buffer "
+          << "but got indices size: " << indices.size() << " and shape size: " << shape.size();
+
+      PrimExpr elem_offset = 0;
+      PrimExpr stride = 1;
+
+      for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+        elem_offset += indices[i] * stride;
+        stride *= shape[i];
+      }
+
       PrimExpr smem_offset = elem_offset + (offset.defined() ? offset.value() : 0);
 
       auto new_buffer = buffer_remap_[load->buffer];
@@ -151,22 +156,34 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
           << "The buffer corresponding to data Var " << access_ptr_call->args[0] << " is not found";
 
       int buffer_row_size = CheckAndGetBufferRowSize(buffer_map_iter->second);
+      (void)buffer_row_size;
 
-      // Convert offset to 2-dimension, reindex it and convert it back
-      PrimExpr row_idx = floordiv(smem_offset, buffer_row_size);
-      PrimExpr col_idx = floormod(smem_offset, buffer_row_size);
-      auto forward_indices = layout_map_[load->buffer]->Forward({row_idx, col_idx});
-      auto new_offset =
-          analyzer_->Simplify(forward_indices[0] * buffer_row_size + forward_indices[1]);
-      Array<PrimExpr> new_indices = {PrimExpr(Div(new_offset, shape[1])),
-                                     PrimExpr(Mod(new_offset, shape[1]))};
+      // Convert offset to target-dimension, reindex it and convert it back
+      Array<PrimExpr> multi_dim_indices;
+      PrimExpr remaining_offset = smem_offset;
+
+      for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+        multi_dim_indices.insert(multi_dim_indices.begin(), floormod(remaining_offset, shape[i]));
+        remaining_offset = floordiv(remaining_offset, shape[i]);
+      }
+
+      auto forward_indices = layout_map_[load->buffer]->Forward(multi_dim_indices);
+      PrimExpr new_offset = 0;
+      PrimExpr stride_offset = 1;
+      for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+        new_offset += forward_indices[i] * stride_offset;
+        stride_offset *= shape[i];
+      }
+      new_offset = analyzer_->Simplify(new_offset);
+
+      Array<PrimExpr> new_indices;
+      for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+        new_indices.insert(new_indices.begin(), floormod(new_offset, shape[i]));
+        new_offset = floordiv(new_offset, shape[i]);
+      }
 
       auto new_access_ptr = access_ptr_call.CopyOnWrite();
-      if (new_buffer->shape.size() == 2) {
-        new_access_ptr->args.Set(0, BufferLoad(new_buffer, new_indices));
-      } else {
-        LOG(FATAL) << "Invalid buffer shape for permuted layout: " << new_buffer->shape;
-      }
+      new_access_ptr->args.Set(0, BufferLoad(new_buffer, new_indices));
     } else {
       LOG(FATAL) << "Invalid access op for permuted layout: " << access_ptr;
     }
@@ -201,7 +218,6 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
         new_call->args.Set(6, IntImm(smem_offset->dtype, 0));
       }
     } else if (call->op.same_as(builtin::mma_store())) {
-      // TODO(yixin): mma_store is not fully tested yet
       // because we will directly store result to Buffer instead of calling mma_store now
       auto access_ptr = call->args[2];
       auto new_access_ptr = HandleAccessPtrAndOffset(access_ptr, NullOpt, call->dtype);
@@ -229,7 +245,6 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
 
   Stmt VisitStmt_(const BufferStoreNode* op) final {
     auto store = Downcast<BufferStore>(IRMutatorWithAnalyzer::VisitStmt_(op));
-
     if (buffer_remap_.count(store->buffer)) {
       auto new_indices = layout_map_[store->buffer]->Forward(store->indices);
       auto new_buffer = buffer_remap_[store->buffer];
@@ -248,6 +263,11 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
   }
 
   Stmt VisitStmt_(const EvaluateNode* op) final {
+    const CallNode* call = op->value.as<CallNode>();
+    // Do not analysis the call node to the global function.
+    if (call && call->op.as<GlobalVarNode>())
+      return Downcast<Evaluate>(IRMutatorWithAnalyzer::VisitStmt_(op));
+
     auto tile_op = ParseOperator(GetRef<Stmt>(op), buffer_data_to_buffer_);
     if (tile_op == nullptr) return IRMutatorWithAnalyzer::VisitStmt_(op);
     AddWorkspaceCallback callback = [this](int num_elem, DataType dtype) {
@@ -255,6 +275,7 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
       workspaces_.push_back(workspace);
       return workspace.access_ptr(2);  // write
     };
+
     auto lowered = tile_op->Lower(
         LowerArgs{target_, thread_block_size_, thread_var_, callback, layout_map_, buffer_remap_},
         analyzer_);

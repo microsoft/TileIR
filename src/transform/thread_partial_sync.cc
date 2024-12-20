@@ -30,13 +30,15 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "../op/builtin.h"
 #include "runtime/thread_storage_scope.h"
 #include "tir/transforms/ir_utils.h"
 #include "tir/transforms/storage_access.h"
-#include "../op/builtin.h"
 
 namespace tvm {
-namespace tir {
+namespace tl {
+
+using namespace tir;
 
 class ThreadPartialSyncPlanner : public StorageAccessVisitor {
  public:
@@ -363,12 +365,14 @@ Stmt ThreadPartialSync(Stmt stmt, std::string storage_scope) {
                             planner.partial_syncs_inserted_)(std::move(stmt));
 }
 
+using namespace tir::transform;
+
 namespace transform {
 
 Pass ThreadPartialSync(String storage_scope) {
   auto pass_func = [storage_scope](PrimFunc f, IRModule m, PassContext ctx) {
     auto* n = f.CopyOnWrite();
-    n->body = ThreadPartialSync(std::move(n->body), storage_scope);
+    n->body = tl::ThreadPartialSync(std::move(n->body), storage_scope);
     return f;
   };
   return CreatePrimFuncPass(pass_func, 0, "tl.ThreadPartialSync", {});

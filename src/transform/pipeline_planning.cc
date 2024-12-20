@@ -66,7 +66,7 @@ class PipelinePlanner : public StmtExprMutator {
       substituter.buffer_data_to_buffer_.Set(buffer->data, buffer);
     }
     auto target = f->GetAttr<Target>(tvm::attr::kTarget);
-    ICHECK(target.defined()) << "Layout_Inference: Require the target attribute";
+    ICHECK(target.defined()) << "Pipeline_Planning: Require the target attribute";
     substituter.target_ = target.value();
     return substituter.VisitStmt(f->body);
   }
@@ -89,10 +89,15 @@ class PipelinePlanner : public StmtExprMutator {
     pinfo.reads = std::move(access[0]);
     pinfo.writes = std::move(access[1]);
     pinfo.original_order = idx;
-    for (auto region : pinfo.reads)
-      if (region->buffer.scope() == "global") pinfo.copy_stage = true;
-    for (auto region : pinfo.writes)
-      if (region->buffer.scope() == "global") pinfo.copy_stage = true;
+
+    // copy stage should only have one reads and one writes
+    if (pinfo.reads.size() == 1 && pinfo.writes.size() == 1) {
+      for (auto region : pinfo.reads)
+        if (region->buffer.scope() == "global") pinfo.copy_stage = true;
+      for (auto region : pinfo.writes)
+        if (region->buffer.scope() == "global") pinfo.copy_stage = true;
+    }
+
     return std::move(pinfo);
   }
 
@@ -160,7 +165,9 @@ class PipelinePlanner : public StmtExprMutator {
         }
       }
     }
-    ICHECK(size_t(order_idx) == pipeline_stage_infos.size());
+    ICHECK(size_t(order_idx) == pipeline_stage_infos.size()) << 
+    "The number of stages should be equal to the number of pipeline stages. " <<
+    "Got " << order_idx << " stages and " << pipeline_stage_infos.size() << " pipeline stages.";
 
     // if all the copy is at the end of the order, we can move these copy to the begining of the
     // order and shrink the stage offset by 1.

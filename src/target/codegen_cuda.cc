@@ -21,7 +21,7 @@
  * \file target/codegen.cc
  */
 
-#include "codegen.h"
+#include "codegen_cuda.h"
 #include <tvm/tir/index_map.h>
 #include <tvm/arith/analyzer.h>
 #include <tvm/runtime/registry.h>
@@ -39,9 +39,9 @@
 namespace tvm {
 namespace codegen {
 
-CodeGenTL::CodeGenTL() { restrict_keyword_ = "__restrict__"; }
+CodeGenTileLangCUDA::CodeGenTileLangCUDA() { restrict_keyword_ = "__restrict__"; }
 
-void CodeGenTL::PrintFuncPrefix(std::ostream& os) { os << "extern \"C\" __global__ "; }
+void CodeGenTileLangCUDA::PrintFuncPrefix(std::ostream& os) { os << "extern \"C\" __global__ "; }
 
 class LaunchConfigExtractor : public tir::StmtVisitor {
  private:
@@ -65,7 +65,7 @@ class LaunchConfigExtractor : public tir::StmtVisitor {
   PrimExpr threadIdx_z_ext = Integer(1);
 };
 
-void CodeGenTL::PrintExtraAttrs(const PrimFunc& f, std::ostream& os) {
+void CodeGenTileLangCUDA::PrintExtraAttrs(const PrimFunc& f, std::ostream& os) {
   LaunchConfigExtractor extractor;
   extractor(f->body);
   arith::Analyzer analyzer;
@@ -80,20 +80,20 @@ void CodeGenTL::PrintExtraAttrs(const PrimFunc& f, std::ostream& os) {
   }
 }
 
-std::string CodeGenTL::Finish() {
+std::string CodeGenTileLangCUDA::Finish() {
   if (need_mma_h_) {
     decl_stream << "#include <mma.h>\n";
   }
-  decl_stream << "#include <tl_templates/gemm.h>\n";
-  decl_stream << "#include <tl_templates/copy.h>\n";
-  decl_stream << "#include <tl_templates/reduce.h>\n";
-  decl_stream << "#include <tl_templates/ldsm.h>\n";
-  decl_stream << "#include <tl_templates/threadblock_swizzle.h>\n";
+  decl_stream << "#include <tl_templates/cuda/gemm.h>\n";
+  decl_stream << "#include <tl_templates/cuda/copy.h>\n";
+  decl_stream << "#include <tl_templates/cuda/reduce.h>\n";
+  decl_stream << "#include <tl_templates/cuda/ldsm.h>\n";
+  decl_stream << "#include <tl_templates/cuda/threadblock_swizzle.h>\n";
   decl_stream << "\n";
   return CodeGenC::Finish();
 }
 
-void CodeGenTL::VisitStmt_(const tir::ForNode* op) {
+void CodeGenTileLangCUDA::VisitStmt_(const tir::ForNode* op) {
   if (op->kind == tir::ForKind::kUnrolled) {
     PrintIndent();
     stream << "#pragma unroll\n";
@@ -113,12 +113,12 @@ void CodeGenTL::VisitStmt_(const tir::ForNode* op) {
   stream << "}\n";
 }
 
-void CodeGenTL::BindThreadIndex(const IterVar& iv) {
+void CodeGenTileLangCUDA::BindThreadIndex(const IterVar& iv) {
   ICHECK(!var_idmap_.count(iv->var.get()));
   var_idmap_[iv->var.get()] = CastFromTo(iv->thread_tag, DataType::UInt(32), iv->var.dtype());
 }
 
-void CodeGenTL::PrintType(DataType t, std::ostream& os) {  // NOLINT(*)
+void CodeGenTileLangCUDA::PrintType(DataType t, std::ostream& os) {  // NOLINT(*)
   int lanes = t.lanes();
   if (t.is_handle()) {
     ICHECK(t.is_scalar()) << "do not yet support vector types";
@@ -364,7 +364,7 @@ void CodeGenTL::PrintType(DataType t, std::ostream& os) {  // NOLINT(*)
   LOG(FATAL) << "Cannot convert type " << t << " to CUDA type";
 }
 
-void CodeGenTL::PrintVecBinaryOp(const std::string& op, DataType t, PrimExpr lhs, PrimExpr rhs,
+void CodeGenTileLangCUDA::PrintVecBinaryOp(const std::string& op, DataType t, PrimExpr lhs, PrimExpr rhs,
                                  std::ostream& os) {  // NOLINT(*)
   // Delcare the result.
   std::string sret = name_supply_->FreshName("_");
@@ -399,7 +399,7 @@ void CodeGenTL::PrintVecBinaryOp(const std::string& op, DataType t, PrimExpr lhs
   os << sret;
 }
 
-void CodeGenTL::PrintVecElemLoad(const std::string& vec, DataType t, int i,
+void CodeGenTileLangCUDA::PrintVecElemLoad(const std::string& vec, DataType t, int i,
                                  std::ostream& os) {  // NOLINT(*)
   if (t.is_scalar()) {
     os << vec;
@@ -444,15 +444,14 @@ void CodeGenTL::PrintVecElemLoad(const std::string& vec, DataType t, int i,
   }
 }
 
-void CodeGenTL::PrintVecElemStore(const std::string& vec, DataType t, int i,
+void CodeGenTileLangCUDA::PrintVecElemStore(const std::string& vec, DataType t, int i,
                                   const std::string& value) {
   this->PrintIndent();
   static const char access[] = {'x', 'y', 'z', 'w'};
   ICHECK(i >= 0 && i < (t.bits() == 8 ? 16 : (t.bits() == 16 || t.bits() == 32) ? 8 : 4));
   if (t.bits() == 8 && (t.is_int() || t.is_uint())) {
     if (t.lanes() == 2 || t.lanes() == 3) {
-      stream << vec << '.' << access[i % t.lanes()] << "="
-             << "(" << value << ");\n";
+      stream << vec << '.' << access[i % t.lanes()] << "=" << "(" << value << ");\n";
     } else {
       std::string ac = t.lanes() == 4 ? vec : (vec + "." + access[i / 4]);
       stream << ac << "=";
@@ -493,7 +492,7 @@ void CodeGenTL::PrintVecElemStore(const std::string& vec, DataType t, int i,
   }
 }
 
-void CodeGenTL::PrintStorageSync(const CallNode* op) {
+void CodeGenTileLangCUDA::PrintStorageSync(const CallNode* op) {
   const std::string& sync = op->args[0].as<StringImmNode>()->value;
   if (sync == "warp") {
     // DO nothing.
@@ -503,7 +502,7 @@ void CodeGenTL::PrintStorageSync(const CallNode* op) {
   }
 }
 
-void CodeGenTL::PrintStorageScope(const std::string& scope, std::ostream& os) {  // NOLINT(*)
+void CodeGenTileLangCUDA::PrintStorageScope(const std::string& scope, std::ostream& os) {  // NOLINT(*)
   ICHECK_NE(scope, "global") << "Cannot allocate global memory when targeting CUDA. You must pass "
                                 "all global arrays as input instead";
   if (scope == "shared") {
@@ -513,7 +512,7 @@ void CodeGenTL::PrintStorageScope(const std::string& scope, std::ostream& os) { 
   }
 }
 
-std::string CodeGenTL::CastFromTo(std::string value, DataType from, DataType target) {
+std::string CodeGenTileLangCUDA::CastFromTo(std::string value, DataType from, DataType target) {
   if (from == target) return value;
   std::ostringstream os;
   os << "((";
@@ -530,7 +529,7 @@ std::string CodeGenTL::CastFromTo(std::string value, DataType from, DataType tar
   return os.str();
 }
 
-void CodeGenTL::VisitExpr_(const CastNode* op, std::ostream& os) {
+void CodeGenTileLangCUDA::VisitExpr_(const CastNode* op, std::ostream& os) {
   DataType from_ty = op->value.dtype();
   DataType target_ty = op->dtype;
   ICHECK_EQ(target_ty.lanes(), from_ty.lanes());
@@ -559,7 +558,7 @@ void CodeGenTL::VisitExpr_(const CastNode* op, std::ostream& os) {
   os << sret;
 }
 
-void CodeGenTL::PrintCallExtern(Type ret_type, String global_symbol, const Array<PrimExpr>& args,
+void CodeGenTileLangCUDA::PrintCallExtern(Type ret_type, String global_symbol, const Array<PrimExpr>& args,
                                 bool skip_first_arg, std::ostream& os) {  // NOLINT(*)
   DataType ret_dtype = GetRuntimeDataType(ret_type);
   if (ret_dtype.is_vector()) {
@@ -614,7 +613,7 @@ void CodeGenTL::PrintCallExtern(Type ret_type, String global_symbol, const Array
 }
 
 // Print a reference expression to a buffer.
-std::string CodeGenTL::GetBufferRef(DataType t, const BufferNode* buffer, PrimExpr index) {
+std::string CodeGenTileLangCUDA::GetBufferRef(DataType t, const BufferNode* buffer, PrimExpr index) {
   const VarNode* buffer_var = buffer->data.get();
   std::ostringstream os;
   std::string vid = GetVarID(buffer_var);
@@ -671,7 +670,7 @@ std::string CodeGenTL::GetBufferRef(DataType t, const BufferNode* buffer, PrimEx
   return os.str();
 }
 
-void CodeGenTL::VisitExpr_(const CallNode* op, std::ostream& os) {
+void CodeGenTileLangCUDA::VisitExpr_(const CallNode* op, std::ostream& os) {
   auto print_extern_call_stmt = [&](std::string name, size_t offset = 0) {
     this->PrintIndent();
     this->stream << name << "(";
@@ -747,6 +746,16 @@ void CodeGenTL::VisitExpr_(const CallNode* op, std::ostream& os) {
     print_extern_call_stmt(func_name, 2);
   } else if (op->op.same_as(tl::FenceProxyAsyncOp())) {
     print_extern_call_stmt("tl::fence_proxy_async");
+  } else if (op->op.same_as(tl::SetMaxNReg())) {
+    this->PrintIndent();
+    int nreg = Downcast<IntImm>(op->args[0])->value;
+    int is_inc = Downcast<IntImm>(op->args[1])->value;
+    std::string func_name = is_inc ? "tl::warpgroup_reg_alloc" : "tl::warpgroup_reg_dealloc";
+    this->stream << func_name << "<" << std::to_string(nreg) << ">();\n";
+  } else if (op->op.same_as(tl::WaitWgmma())) {
+    this->PrintIndent();
+    int num_mma = Downcast<IntImm>(op->args[0])->value;
+    this->stream << "tl::wait_wgmma<" << std::to_string(num_mma) << ">();\n";
   } else if (op->op.same_as(tl::PackB16Op())) {
     os << "__pack_half2(" << this->PrintExpr(op->args[0]) << ", " << this->PrintExpr(op->args[1])
        << ")";
@@ -933,11 +942,22 @@ void CodeGenTL::VisitExpr_(const CallNode* op, std::ostream& os) {
 
     const auto* index_map_func =
         runtime::Registry::Get("tir.index_map.shared_16x16_to_mma_32x8_layout");
-    ICHECK(index_map_func);
+    
+    IndexMap index_map;
+    if (!index_map_func) {
+      Var i, j;
+      
+      // The index map is defined as follows:
+      index_map = IndexMap({i, j}, {
+        4 * FloorMod(i, 8) + FloorDiv(FloorMod(j, 8), 2), 4 * FloorDiv(j, 8) + FloorDiv(i, 8) * 2 + FloorMod(j, 2)
+      });
+    } else{
+      index_map = IndexMap::FromFunc(2, *index_map_func); 
+    }
 
     arith::Analyzer analyzer;
     auto inverse_index_map =
-        IndexMap::FromFunc(2, *index_map_func).Inverse({Range(0, m), Range(0, n)}, &analyzer);
+        index_map.Inverse({Range(0, m), Range(0, n)}, &analyzer);
     auto indices_16x16 = inverse_index_map->final_indices;
 
     // "//" and "%" in the index map are translated to FloorDiv/Mod, but the plain Div/Mod are fine.
@@ -1091,8 +1111,16 @@ void CodeGenTL::VisitExpr_(const CallNode* op, std::ostream& os) {
   }
 }
 
-void CodeGenTL::VisitStmt_(const AttrStmtNode* op) {
-  if (op->attr_key == tir::attr::async_commit_queue_scope) {
+void CodeGenTileLangCUDA::VisitStmt_(const AttrStmtNode* op) {
+  if (op->attr_key == tir::attr::fragment_shape) {
+    const VarNode* buffer = op->node.as<VarNode>();
+    const StringImmNode* shape_str = op->value.as<StringImmNode>();
+    fragment_shapes[buffer] = shape_str->value;
+  } else if (op->attr_key == tir::attr::fragment_layout) {
+    const VarNode* buffer = op->node.as<VarNode>();
+    const StringImmNode* layout_str = op->value.as<StringImmNode>();
+    fragment_layouts[buffer] = layout_str->value;
+  } else if (op->attr_key == tir::attr::async_commit_queue_scope) {
     const IntImmNode* queue_id = op->value.as<IntImmNode>();
     ICHECK(queue_id && queue_id->value == 0) << "For CUDA, the index of an async queue must be 0.";
     this->VisitStmt(op->body);
@@ -1121,21 +1149,40 @@ void CodeGenTL::VisitStmt_(const AttrStmtNode* op) {
   CodeGenC::VisitStmt_(op);
 }
 
-void CodeGenTL::VisitStmt_(const AllocateNode* op) {
+void CodeGenTileLangCUDA::VisitStmt_(const AllocateNode* op) {
   ICHECK(!is_zero(op->condition));
   std::string vid = AllocVarID(op->buffer_var.get());
 
   this->PrintIndent();
   std::string scope = GetPtrStorageScope(op->buffer_var);
-  PrintStorageScope(scope, stream);
-  PrintType(op->dtype, stream);
+  const VarNode* buffer = op->buffer_var.as<VarNode>();
+  if (scope.find("wmma.") == 0) {
+    if (scope == "wmma.matrix_a" || scope == "wmma.matrix_b") {
+      ICHECK(op->dtype == DataType::Float(16) || op->dtype == DataType::Int(8) ||
+             op->dtype == DataType::UInt(8) || op->dtype == DataType::Int(4) ||
+             op->dtype == DataType::UInt(4) || op->dtype == DataType::Int(1) ||
+             op->dtype == DataType::BFloat(16))
+          << "Matrix_a and matrix_b only support half or char or unsigned char "
+          << "or uint4 or int4 or int1 type for now";
+    } else {
+      ICHECK(op->dtype == DataType::Float(16) || op->dtype == DataType::Float(32) ||
+             op->dtype == DataType::Int(32))
+          << "Accumulator only support half, float and int type for now";
+    }
+    PrintWmmaScope(scope, op->dtype, buffer, stream);
+  } else{
+    PrintStorageScope(scope, stream);
+    PrintType(op->dtype, stream);
+  }
 
   if (scope == "shared.dyn") {
     stream << ' ' << vid << "[];\n";
   } else {
     size_t constant_size = op->ConstantAllocationSize();
     ICHECK_GT(constant_size, 0) << "Can only handle constant size stack allocation for now";
-
+    if (scope.find("wmma.") == 0) {
+      constant_size = GetWmmaFragmentSize(scope, buffer, constant_size);
+    }
     if ((op->dtype == DataType::Int(4) || op->dtype == DataType::UInt(4) ||
          op->dtype == DataType::Int(1)) &&
         scope == "shared") {
@@ -1148,7 +1195,7 @@ void CodeGenTL::VisitStmt_(const AllocateNode* op) {
   this->PrintStmt(op->body);
 }
 
-void CodeGenTL::VisitExpr_(const RampNode* op, std::ostream& os) {
+void CodeGenTileLangCUDA::VisitExpr_(const RampNode* op, std::ostream& os) {
   int lanes = static_cast<int>(Downcast<IntImm>(op->lanes)->value);
   CHECK_LE(lanes, 4) << "ValueError: Ramp of more than 4 lanes is not allowed.";
   os << "(make_";
@@ -1162,7 +1209,7 @@ void CodeGenTL::VisitExpr_(const RampNode* op, std::ostream& os) {
   os << "))";
 }
 
-void CodeGenTL::VisitExpr_(const BroadcastNode* op, std::ostream& os) {  // NOLINT(*)
+void CodeGenTileLangCUDA::VisitExpr_(const BroadcastNode* op, std::ostream& os) {  // NOLINT(*)
   int lanes = static_cast<int>(Downcast<IntImm>(op->lanes)->value);
   if ((op->dtype.is_int() || op->dtype.is_uint()) && op->dtype.bits() == 8 && lanes == 4) {
     // make_int8x4
@@ -1270,7 +1317,7 @@ void CodeGenTL::VisitExpr_(const BroadcastNode* op, std::ostream& os) {  // NOLI
   os << ')';
 }
 
-inline void PrintConst(const FloatImmNode* op, std::ostream& os, CodeGenTL* p) {  // NOLINT(*)
+inline void PrintConst(const FloatImmNode* op, std::ostream& os, CodeGenTileLangCUDA* p) {  // NOLINT(*)
   // Type code is kBFloat
   if (op->dtype.is_bfloat16()) {
     os << "bfloat16_t";
@@ -1309,11 +1356,64 @@ inline void PrintConst(const FloatImmNode* op, std::ostream& os, CodeGenTL* p) {
   }
 }
 
-void CodeGenTL::VisitExpr_(const FloatImmNode* op, std::ostream& os) {  // NOLINT(*)
+void CodeGenTileLangCUDA::VisitExpr_(const FloatImmNode* op, std::ostream& os) {  // NOLINT(*)
   PrintConst(op, os, this);
 }
 
-void CodeGenTL::HandleVolatileLoads(const std::string& value, const BufferLoadNode* op,
+void CodeGenTileLangCUDA::PrintWmmaScope(const std::string& scope, DataType t,
+                                         const VarNode* variable, std::ostream& os) {
+  std::stringstream type;
+  PrintType(t, type);
+  ICHECK(fragment_shapes.count(variable)) << "Cannot find shape of the wmma fragment "
+                                          << variable->name_hint;
+  std::string shape_str = fragment_shapes.at(variable);
+  if ((t.is_int() || t.is_uint()) && t.bits() < 8 && t.lanes() == 1) {
+    type.str(std::string());
+    if (t.is_int()) {
+      if (t.bits() == 4) {
+        type << "nvcuda::wmma::experimental::precision::s4";
+      } else if (t.bits() == 1) {
+        type << "nvcuda::wmma::experimental::precision::b1";
+      } else {
+        LOG(FATAL) << "Unhandled interger type for wmma fragment!";
+      }
+    } else if (t.is_uint()) {
+      if (t.bits() == 4) {
+        type << "nvcuda::wmma::experimental::precision::u4";
+      } else {
+        LOG(FATAL) << "Unhandled interger type for wmma fragment!";
+      }
+    }
+  }
+  if (scope == "wmma.matrix_a") {
+    std::string layout_str = fragment_layouts[variable];
+    ICHECK_NE(layout_str, "") << "Layout must be defined for matrix_a";
+    os << "nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, " << shape_str << ", " << type.str()
+       << ", nvcuda::wmma::" << layout_str << ">";
+  } else if (scope == "wmma.matrix_b") {
+    std::string layout_str = fragment_layouts[variable];
+    ICHECK_NE(layout_str, "") << "Layout must be defined for matrix_b";
+    os << "nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, " << shape_str << ", " << type.str()
+       << ", nvcuda::wmma::" << layout_str << ">";
+  } else if (scope == "wmma.accumulator") {
+    os << "nvcuda::wmma::fragment<nvcuda::wmma::accumulator, " << shape_str << ", " << type.str()
+       << ">";
+  }
+}
+
+int32_t CodeGenTileLangCUDA::GetWmmaFragmentSize(const std::string& scope, const VarNode* variable,
+                                                 int32_t size) {
+  ICHECK(fragment_shapes.count(variable)) << "Cannot find shape of the wmma fragment "
+                                          << variable->name_hint;
+  std::string shape_str = fragment_shapes.at(variable);
+  std::pair<int32_t, int32_t> dim = GetWmmaFragmentDimSize(shape_str, scope);
+  if (dim.first * dim.second != 0)
+    return size / dim.first / dim.second;
+  else
+    return 0;
+}
+
+void CodeGenTileLangCUDA::HandleVolatileLoads(const std::string& value, const BufferLoadNode* op,
                                     std::ostream& os) {
   // Cast away volatile qualifier for fp16 types. That is, only loads and
   // stores are volatile. The loaded objects are not marked as volatile.
@@ -1327,7 +1427,7 @@ void CodeGenTL::HandleVolatileLoads(const std::string& value, const BufferLoadNo
   }
 }
 
-void CodeGenTL::PrintVecElemLoadExpr(DataType t, int i, const std::string& value,
+void CodeGenTileLangCUDA::PrintVecElemLoadExpr(DataType t, int i, const std::string& value,
                                      std::ostream& os) {
   ICHECK_GT(t.lanes(), 1);
   if (t.bits() == 8 && (t.is_int() || t.is_uint())) {
@@ -1392,7 +1492,7 @@ void CodeGenTL::PrintVecElemLoadExpr(DataType t, int i, const std::string& value
   return;
 }
 
-void CodeGenTL::AddFunction(const PrimFunc& f) {
+void CodeGenTileLangCUDA::AddFunction(const PrimFunc& f) {
   // clear previous generated state.
   this->InitFuncState(f);
   // reserve keywords

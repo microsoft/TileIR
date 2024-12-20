@@ -32,6 +32,7 @@
 #include "../target/utils.h"
 #include "../transform/loop_partition.h"
 #include "../transform/loop_vectorize.h"
+#include "../transform/common/loop_fusion_utils.h"
 #include "builtin.h"
 
 namespace tvm {
@@ -52,6 +53,9 @@ Copy::Copy(Array<PrimExpr> args, BufferMap vmap) : args_(args) {
   }
   std::tie(this->src, this->dst) = std::tie(bf[0], bf[1]);
   std::tie(this->src_range, this->dst_range) = std::tie(rgs[0], rgs[1]);
+  if (args.size() >= 3){
+    coalesced_width = Downcast<IntImm>(args[2]);
+  }
 }
 
 Array<IterVar> Copy::MakeIterVars() const {
@@ -129,7 +133,11 @@ For Copy::MakeSIMTLoop(arith::Analyzer* analyzer) const {
   if (dst_predicate.defined()) body = IfThenElse(dst_predicate, body);
 
   for (int i = loop_vars.size() - 1; i >= 0; i--) {
-    body = For(loop_vars[i]->var, 0, loop_vars[i]->dom->extent, ForKind::kParallel, body);
+    Map<String, ObjectRef> annotations = {};
+    if (coalesced_width.defined()){
+      annotations.Set("coalesced_width", coalesced_width);
+    }
+    body = For(loop_vars[i]->var, 0, loop_vars[i]->dom->extent, ForKind::kParallel, body, NullOpt, annotations);
   }
   return Downcast<For>(body);
 }
@@ -140,18 +148,18 @@ Stmt Copy::Lower(const LowerArgs& T, arith::Analyzer* analyzer) const {
 
   Stmt bulk_copy_stmt = LowerBulkCopy(T, analyzer);
   if (bulk_copy_stmt.defined()) return bulk_copy_stmt;
+  auto simt_loop = MakeSIMTLoop(analyzer);
+  auto fused_loop = Downcast<For>(ParallelLoopFuser::Fuse(simt_loop));
 
-  auto par_op = std::make_unique<ParallelOp>(MakeSIMTLoop(analyzer));
-  par_op->InferLayout({T.target, T.block_size, T.layout_map}, InferLevel::kFree);
+  auto par_op = std::make_unique<ParallelOp>(fused_loop);
+  par_op->InferLayout({T.target, T.block_size, T.layout_map, T.buffer_remap}, InferLevel::kFree);
   auto thread_loop =
       PartitionLoop(par_op->GetRoot(), T.thread_var, analyzer, par_op->GetLoopLayout());
-
   auto vectorized_thread_loop = VectorizeLoop(thread_loop);
   if (par_op->GetPredicate(T.thread_var).defined()) {
     return IfThenElse(par_op->GetPredicate(T.thread_var).value(), vectorized_thread_loop);
-  } else {
-    return vectorized_thread_loop;
   }
+
   return vectorized_thread_loop;
 }
 
@@ -342,17 +350,16 @@ Stmt Fill::Lower(const LowerArgs& T, arith::Analyzer* analyzer) const {
     return vectorized_thread_loop;
   } else if (dst.scope() == "local") {
     auto init_loop = MakeSIMTLoop(analyzer);
-    // CHECK(false) << "Unsupported scope " << dst.scope();
     auto vectorized_thread_loop = VectorizeLoop(init_loop);
     return vectorized_thread_loop;
-  } else{
+  } else {
     LOG(FATAL) << "Unsupported scope " << dst.scope();
   }
 
 }
 
 TIR_REGISTER_TL_OP(Copy, copy)
-    .set_num_inputs(2)
+    .set_num_inputs(3)
     .set_attr<TCallEffectKind>("TCallEffectKind", Integer(CallEffectKind::kOpaque));
 
 TIR_REGISTER_TL_OP(Fill, fill)

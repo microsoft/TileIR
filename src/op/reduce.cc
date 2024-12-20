@@ -44,6 +44,8 @@ ReduceOp::ReduceOp(Array<PrimExpr> args, BufferMap vmap) {
   dim = args[3].as<IntImm>().value()->value;
   if (reduce_type == "sum")
     type = ReduceType::kSum;
+  else if (reduce_type == "abssum")
+    type = ReduceType::kAbsSum;
   else if (reduce_type == "max")
     type = ReduceType::kMax;
   else if (reduce_type == "min")
@@ -56,6 +58,8 @@ ReduceOp::ReduceOp(Array<PrimExpr> args, BufferMap vmap) {
 PrimExpr ReduceOp::MakeInitValue() const {
   switch (type) {
     case ReduceType::kSum:
+      return make_zero(dst->dtype);
+    case ReduceType::kAbsSum:
       return make_zero(dst->dtype);
     case ReduceType::kMax:
       return make_const(dst->dtype, -INFINITY);
@@ -74,6 +78,8 @@ PrimExpr ReduceOp::MakeReduce(const PrimExpr& a, const PrimExpr& b) const {
   switch (type) {
     case ReduceType::kSum:
       return lhs + rhs;
+    case ReduceType::kAbsSum:
+      return lhs + Max(rhs, -rhs);
     case ReduceType::kMax:
       return Max(lhs, rhs);
     case ReduceType::kMin:
@@ -87,6 +93,8 @@ PrimExpr ReduceOp::MakeReduce(const PrimExpr& a, const PrimExpr& b) const {
 std::string ReduceOp::MakeCodegenReducer() const {
   switch (type) {
     case ReduceType::kSum:
+      return "tl::SumOp";
+    case ReduceType::kAbsSum:
       return "tl::SumOp";
     case ReduceType::kMax:
       return "tl::MaxOp";
@@ -176,7 +184,7 @@ Stmt ReduceOp::Lower(const LowerArgs& T, arith::Analyzer* analyzer) const {
       BufferStore(dst_buffer, BufferLoad(dst_buffer, dst_indices), dst_indices);
 
   // make the outer spatial loop
-  Stmt body = SeqStmt(stmts);
+  Stmt body = stmts.size() > 1 ? SeqStmt(stmts) : stmts[0];
   for (int i = dst_layout->InputDim() - 1; i >= 0; i--) {
     body = For(dst_vars[i]->var, 0, dst_vars[i]->dom->extent, ForKind::kParallel, body);
   }

@@ -160,6 +160,22 @@ static Stmt makeParityWait(PrimExpr barrier_id, PrimExpr parity) {
   return Evaluate(call);
 }
 
+// static bool isGemm(Stmt stmt) {
+//   bool is_gemm = false;
+//   if (stmt.as<EvaluateNode>()) {
+//     auto call = Downcast<Evaluate>(stmt)->value.as<CallNode>();
+//     if (call && call->op.same_as(Op::Get("tir.call_extern"))) {
+//       if (call->args[0].as<StringImmNode>()) {
+//         std::string name = Downcast<StringImm>(call->args[0])->value;
+//         if (name.find("gemm") != std::string::npos) {
+//           is_gemm = true;
+//         }
+//       }
+//     }
+//   }
+//   return is_gemm;
+// }
+
 class ProducerTraitsCollector : public StmtExprVisitor {
  public:
   ProducerTraitsCollector() { Clear(); }
@@ -226,176 +242,6 @@ class MbarrierRewriter : public StmtExprMutator {
   PrimExpr producer_barrier_idx_;
 };
 
-class MultiVersionBufferRewriter : public StmtExprMutator {
- public:
-  static PrimFunc Rewrite(PrimFunc& f) {
-    auto rewriter = MultiVersionBufferRewriter();
-    rewriter.buffer_lca_ = DetectBufferAccessLCA(f);
-    for (auto [buffer, _] : rewriter.buffer_lca_) {
-      Var buffer_var = buffer->data;
-      rewriter.buffer_data_to_buffer_.Set(buffer_var, buffer);
-    }
-    f.CopyOnWrite()->body = rewriter(f->body);
-    return f;
-  }
-
- private:
-  MultiVersionBufferRewriter() = default;
-
-  Array<Buffer> GetVersionedBuffers(Array<Stmt> seq_stmt, Array<Buffer> scoped_buffers) {
-    std::vector<Role> roles;
-    Array<Array<BufferRegion>> reads, writes;
-    auto marker = WarpSpecializedRoleMarker(buffer_data_to_buffer_);
-    for (auto stmt : seq_stmt) {
-      marker(stmt);
-      Block block(/*iter_vars=*/{}, /*reads=*/{}, /*writes=*/{}, /*name_hint=*/"", /*body*/ stmt);
-      auto access = GetBlockAccessRegion(block, buffer_data_to_buffer_);
-      reads.push_back(std::move(access[0]));
-      writes.push_back(std::move(access[1]));
-      roles.push_back(marker.GetRole(stmt));
-    }
-
-    std::unordered_set<const BufferNode*> consumer_used, producer_used;
-    for (size_t i = 0; i < seq_stmt.size(); i++) {
-      if (roles[i] == Role::kProducer) {
-        for (BufferRegion br : writes[i]) producer_used.insert(br->buffer.get());
-      } else {
-        for (BufferRegion br : reads[i]) consumer_used.insert(br->buffer.get());
-      }
-    }
-    Array<Buffer> versioned_buffers;
-    for (Buffer buffer : scoped_buffers) {
-      if (consumer_used.count(buffer.get()) && producer_used.count(buffer.get())) {
-        versioned_buffers.push_back(buffer);
-      }
-    }
-    return versioned_buffers;
-  }
-
-  static Buffer RewriteAllocBuffer(const Buffer& buffer, int num_versions) {
-    ObjectPtr<BufferNode> new_buffer = make_object<BufferNode>(*(buffer.get()));
-    new_buffer->shape.insert(new_buffer->shape.begin(), PrimExpr(num_versions));
-    if (new_buffer->strides.size()) {
-      ICHECK(new_buffer->strides.size() + 1 == new_buffer->shape.size());
-      PrimExpr stride_0 = new_buffer->strides[0] * new_buffer->shape[1];
-      new_buffer->strides.insert(new_buffer->strides.begin(), stride_0);
-    }
-    return Buffer(new_buffer);
-  }
-
-  Stmt VisitStmt_(const BlockRealizeNode* op) final {
-    BlockRealize block_realize = Downcast<BlockRealize>(StmtExprMutator::VisitStmt_(op));
-    Block block = block_realize->block;
-    Array<Buffer> alloc_buffers;
-    for (auto buffer : block->alloc_buffers) {
-      if (buffer_remap_.count(buffer)) {
-        Buffer new_buffer = buffer_remap_[buffer];
-        alloc_buffers.push_back(new_buffer);
-      } else {
-        alloc_buffers.push_back(buffer);
-      }
-    }
-    block.CopyOnWrite()->alloc_buffers = std::move(alloc_buffers);
-    block_realize.CopyOnWrite()->block = block;
-    return block_realize;
-  }
-
-  Stmt VisitStmt_(const ForNode* op) final {
-    auto num_stages_anno = op->annotations.Get("num_stages");
-    if (!num_stages_anno.defined()) return StmtExprMutator::VisitStmt_(op);
-
-    ICHECK(num_stages_anno.as<IntImmNode>());
-    int num_stages = static_cast<int>(num_stages_anno.as<IntImmNode>()->value);
-
-    const SeqStmtNode* pipeline_body_seq = op->body.as<SeqStmtNode>();
-    CHECK(pipeline_body_seq)
-        << "ValueError: The body of the software pipeline should be SeqStmt, got "
-        << op->body->GetTypeKey();
-
-    Array<Buffer> scoped_buffers = {};
-    for (auto [buffer, stmt] : buffer_lca_) {
-      if (stmt.defined() && stmt.value().get() == op) scoped_buffers.push_back(buffer);
-    }
-
-    Array<Buffer> versioned_buffers = GetVersionedBuffers(pipeline_body_seq->seq, scoped_buffers);
-
-    for (auto buffer : versioned_buffers) {
-      Var buffer_var = buffer->data;
-      Buffer new_buffer = RewriteAllocBuffer(buffer, num_stages);
-      buffer_remap_.Set(buffer, new_buffer);
-    }
-    version_index_ = FloorMod(op->loop_var - op->min, num_stages);
-    auto for_node = StmtExprMutator::VisitStmt_(op);
-
-    return for_node;
-  }
-
-  PrimExpr VisitExpr_(const BufferLoadNode* op) final {
-    BufferLoad load = Downcast<BufferLoad>(StmtExprMutator::VisitExpr_(op));
-    auto it = buffer_remap_.find(load->buffer);
-    if (it == buffer_remap_.end()) {
-      return std::move(load);
-    }
-    const Buffer& new_buffer = (*it).second;
-    auto* n = load.CopyOnWrite();
-    n->buffer = new_buffer;
-    n->indices.insert(n->indices.begin(), version_index_);
-    return std::move(load);
-  }
-
-  Stmt VisitStmt_(const BufferStoreNode* op) final {
-    BufferStore store = Downcast<BufferStore>(StmtExprMutator::VisitStmt_(op));
-    auto it = buffer_remap_.find(store->buffer);
-    if (it == buffer_remap_.end()) {
-      return std::move(store);
-    }
-    const Buffer& new_buffer = (*it).second;
-    auto* n = store.CopyOnWrite();
-    n->buffer = new_buffer;
-    n->indices.insert(n->indices.begin(), version_index_);
-    return std::move(store);
-  }
-
-  PrimExpr VisitExpr_(const CallNode* op) final {
-    Call call = Downcast<Call>(StmtExprMutator::VisitExpr_(op));
-    if (call->op.same_as(builtin::tvm_access_ptr())) {
-      return RewriteBufferAccess(call, {1});
-    }
-    return call;
-  }
-
-  PrimExpr RewriteBufferAccess(const Call& call, const std::vector<int> arg_indices) {
-    auto product = [](const Array<PrimExpr>& input) {
-      return foldl([](PrimExpr a, PrimExpr b, Span span) { return mul(a, b, span); },
-                   make_const(DataType::Int(32), 1), input);
-    };
-    Array<PrimExpr> new_args = call->args;
-    for (int i : arg_indices) {
-      auto buffer_var = Downcast<Var>(call->args[i]);
-      if (!buffer_data_to_buffer_.count(buffer_var)) continue;
-      const Buffer& buffer = buffer_data_to_buffer_[buffer_var];
-      auto it = buffer_remap_.find(buffer);
-      if (it != buffer_remap_.end()) {
-        const Buffer& new_buffer = (*it).second;
-        const PrimExpr& old_index = call->args[i + 1];
-        PrimExpr offset;
-        if (new_buffer->strides.empty()) {
-          offset = product(buffer->shape);
-        } else {
-          offset = new_buffer->strides[0];
-        }
-        PrimExpr new_index = old_index + version_index_ * offset;
-        new_args.Set(i + 1, new_index);
-      }
-    }
-    return Call(call->dtype, call->op, new_args, call->span);
-  }
-
-  PrimExpr version_index_;
-  Map<Var, Buffer> buffer_data_to_buffer_;
-  Map<Buffer, Optional<Stmt>> buffer_lca_;
-  Map<Buffer, Buffer> buffer_remap_;
-};
 
 class ThreadIdxRewriter : public StmtExprMutator {
  public:
@@ -420,6 +266,155 @@ class ThreadIdxRewriter : public StmtExprMutator {
   PrimExpr replaced_;
 };
 
+Block MakeGroupBlock(const Stmt& stmt, const Map<String, ObjectRef>& annotations) {
+  Block block(/*iter_vars=*/{}, /*reads=*/{}, /*writes=*/{}, /*name_hint=*/"", /*body*/ stmt,
+              /*init=*/{}, /*alloc_buffers=*/{}, /*match_buffers=*/{}, /*annotations=*/annotations);
+  return block;
+}
+
+struct OpInfo {
+  int group_size, order, stage;
+  std::vector<int> group;
+};
+struct PipelineInfo {
+  std::vector<OpInfo> op_infos;
+
+  PipelineInfo() = default;
+  PipelineInfo(
+    Array<Array<Integer>> group_info,
+    Array<Integer> order_info,
+    Array<Integer> stage_info
+  ) {
+    int n = static_cast<int>(group_info.size());
+    ICHECK(n == static_cast<int>(order_info.size()));
+    ICHECK(n == static_cast<int>(stage_info.size()));
+    // int cur_id = 0;
+    for (int i = 0; i < n; i++) {
+      OpInfo op_info;
+      op_info.group_size = group_info[i].size();
+      for (int j = 0; j < op_info.group_size; j++) {
+        op_info.group.push_back(group_info[i][j].as<IntImmNode>()->value);
+      }
+      op_info.order = order_info[i].as<IntImmNode>()->value;
+      op_info.stage = stage_info[i].as<IntImmNode>()->value;
+      op_infos.push_back(op_info);
+    }
+  }
+
+  PipelineInfo(const PipelineInfo& other) {
+    for (auto op_info : other.op_infos) {
+      op_infos.push_back(op_info);
+    }
+  }
+
+  std::pair<int, int> FindStmt(int stmt_idx) {
+    for (size_t i = 0; i < op_infos.size(); i++) {
+      for (size_t j = 0; j < op_infos[i].group.size(); j++) {
+        if (op_infos[i].group[j] == stmt_idx) {
+          return std::make_pair(i, j);
+        }
+      }
+    }
+    return std::make_pair(-1, -1);
+  }
+
+  void UpdateOrder(int order) {
+    for (int i = 0; i < static_cast<int>(op_infos.size()); i++) {
+      if (op_infos[i].order >= order && op_infos[i].order > 0) {
+        op_infos[i].order++;
+      }
+    }
+  }
+
+  int SplitOp(int stmt_idx) {
+    auto pair = FindStmt(stmt_idx);
+    int op_idx = pair.first;
+    int inner_idx = pair.second;
+    ICHECK(op_idx != -1);
+    ICHECK(inner_idx != -1);
+    OpInfo half0;
+    OpInfo half1;
+    // The order to do sync
+    int sync_order = op_infos[op_idx].order + 1;
+    UpdateOrder(sync_order);
+
+    half0.group_size = inner_idx + 1;
+    half0.order = op_infos[op_idx].order;
+    half0.stage = op_infos[op_idx].stage;
+    for (int i = 0; i <= inner_idx; i++) {
+      half0.group.push_back(op_infos[op_idx].group[i]);
+    }
+    half1.group_size = op_infos[op_idx].group_size - inner_idx - 1;
+    half1.order = op_infos[op_idx].order + 2;
+    half1.stage = op_infos[op_idx].stage;
+    for (int i = inner_idx + 1; i < op_infos[op_idx].group_size; i++) {
+      half1.group.push_back(op_infos[op_idx].group[i]);
+    }
+    op_infos.erase(op_infos.begin() + op_idx);
+    if (half0.group_size > 0) {
+      op_infos.insert(op_infos.begin() + op_idx, half0);
+    }
+    if (half1.group_size > 0) {
+      UpdateOrder(half1.order);
+      op_infos.insert(op_infos.begin() + op_idx + 1, half1);
+    }
+    return sync_order;
+  }
+
+  void PrintPipelineInfo() {
+    std::cout << "Print op_infos:" << std::endl;
+    for (size_t i = 0; i < op_infos.size(); i++) {
+      std::cout << i << " " << op_infos[i].group_size << " " << op_infos[i].order << " " << op_infos[i].stage << std::endl;
+    }
+    std::cout << "End of print" << std::endl;
+  }
+};
+
+class GroupOpRewriter : public StmtExprMutator {
+ public:
+  GroupOpRewriter(PipelineInfo pipeline_info) : pipeline_info_(pipeline_info) {}
+
+ private:
+  Stmt VisitStmt_(const ForNode* op) final {
+    Map<String, ObjectRef> annotations;
+    annotations.Set(String("stmt_group"), Integer(1));
+    auto original_node = (op->body).as<SeqStmtNode>();
+    if (!original_node) {
+      return GetRef<For>(op);
+    }
+    Array<Stmt> new_body;
+    int cur_id = 0;
+    for (int i = 0; i < static_cast<int>(pipeline_info_.op_infos.size()); i++) {
+      if (pipeline_info_.op_infos[i].group_size == 0) continue;
+      Array<Stmt> block_stmt;
+      for (int j = 0; j < static_cast<int>(pipeline_info_.op_infos[i].group_size); j++) {
+        // ICHECK(group_info_[i][j].as<IntImmNode>());
+        // int index = static_cast<int>(group_info_[i][j].as<IntImmNode>()->value);
+        ICHECK(original_node->seq[cur_id].as<BlockNode>());
+        auto block = original_node->seq[cur_id].as<BlockNode>();
+        // TODO: handle nested seqstmt
+        block_stmt.push_back(block->body);
+        cur_id++;
+      }
+      new_body.push_back(
+        MakeGroupBlock(block_stmt.size() == 1 ? block_stmt[0] : SeqStmt(std::move(block_stmt)), annotations));
+    }
+    Array<Integer> order_anno;
+    Array<Integer> stage_anno;
+    for (auto op_info : pipeline_info_.op_infos) {
+      order_anno.push_back(Integer(op_info.order));
+      stage_anno.push_back(Integer(op_info.stage));
+    }
+    Map<String, ObjectRef> for_annotations = op->annotations;
+    for_annotations.erase("tl_pipeline_group");
+    for_annotations.Set("software_pipeline_order", order_anno);
+    for_annotations.Set("software_pipeline_stage", stage_anno);
+    For new_for = For(op->loop_var, op->min, op->extent, op->kind, new_body.size() == 1 ? new_body[0] : SeqStmt(std::move(new_body)), op->thread_binding, for_annotations);
+    return new_for;
+  }
+
+  PipelineInfo pipeline_info_;
+};
 class WSCodeEmitter : public StmtMutator {
  public:
   WSCodeEmitter(bool is_emitting_producer, IterVar thread_iv,
@@ -441,6 +436,7 @@ class WSCodeEmitter : public StmtMutator {
       return Evaluate(0);
   }
 
+  // TODO: only need to add block for ops in the loop
   Stmt VisitStmt_(const SeqStmtNode* op) final {
     bool has_producer = false;
     for (auto stmt : op->seq) {
@@ -455,21 +451,35 @@ class WSCodeEmitter : public StmtMutator {
     auto seq_transformed = op->seq.Map([&](Stmt stmt) { return VisitStmt(stmt); });
 
     auto map = ExtractSyncPattern(op->seq);
+    // std::cout << "Print ExtractSyncPattern" << std::endl;
+    // for (int i = 0; i < static_cast<int>(op->seq.size()); i++) {
+    //   std::cout << i << " " << map.acquire[i] << " " << map.release[i] << " " << map.release_after[i] << std::endl;
+    // }
+    // std::cout << "Print sync pattern" << std::endl;
+    // for (auto pattern : map.patterns) {
+    //   std::cout << pattern.release_idx << " " << pattern.acquire_idx << std::endl;
+    // }
+    // std::cout << "End of ExtractSyncPattern" << std::endl;
+    // pipeline_info_.PrintPipelineInfo();
     Array<Stmt> new_body;
+    Map<String, ObjectRef> annotations;
+    annotations.Set(String("stmt_group"), Integer(1));
 
     if (is_emitting_producer_) {  // producer case
       ProducerTraitsCollector collector;
       for (int i = 0; i < static_cast<int>(op->seq.size()); i++) {
+        Array<Stmt> block_stmt = {};
         if (marker_.GetRole(op->seq[i]) == Role::kConsumer) continue;
         if (marker_.GetRole(op->seq[i]) == Role::kBoth) {
-          new_body.push_back(seq_transformed[i]);
+          block_stmt.push_back(seq_transformed[i]);
+          new_body.push_back(MakeGroupBlock(block_stmt.size() == 1 ? block_stmt[0] : SeqStmt(std::move(block_stmt)), annotations));
           continue;
         }
         if (map.acquire[i] != -1) {
           PrimExpr acquire_barrier_id = stage_ + num_barriers_ + num_stages_ * map.acquire[i];
           PrimExpr parity =
               map.is_loop_dependency(map.acquire[i]) ? bitwise_xor(parity_, 1) : parity_;
-          new_body.push_back(makeParityWait(acquire_barrier_id, parity));
+          block_stmt.push_back(makeParityWait(acquire_barrier_id, parity));
         }
         ICHECK(map.release[i] >= 0);
         PrimExpr release_barrier_id = stage_ + num_barriers_ + num_stages_ * map.release[i];
@@ -478,38 +488,63 @@ class WSCodeEmitter : public StmtMutator {
         if (!is_zero(collector.BulkCopyBytes())) {
           auto expect_tx = IfThenElse(EQ(thread_var_, 0),
                                       makeExpectTX(release_barrier_id, collector.BulkCopyBytes()));
-          new_body.push_back(expect_tx);
+          block_stmt.push_back(expect_tx);
         }
-        new_body.push_back(stmt);
+        block_stmt.push_back(stmt);
         if (collector.HasSimtCopy() > 0) {
-          new_body.push_back(makeCpAsyncBarrier(release_barrier_id));
+          block_stmt.push_back(makeCpAsyncBarrier(release_barrier_id));
         }
         if (map.release_after[i]) {
-          new_body.push_back(makeArriveBarrier(release_barrier_id));
+          block_stmt.push_back(makeArriveBarrier(release_barrier_id));
           for (int j = 0; j < num_stages_; j++) {
             released_barrier_.insert(j + num_barriers_ + num_stages_ * map.release[i]);
           }
         }
         collector.Clear();
+        new_body.push_back(MakeGroupBlock(block_stmt.size() == 1 ? block_stmt[0] : SeqStmt(std::move(block_stmt)), annotations));
       }
     } else {  // consumer case
       for (int i = 0; i < static_cast<int>(op->seq.size()); i++) {
+        Array<Stmt> block_stmt = {};
         if (marker_.GetRole(op->seq[i]) == Role::kProducer) continue;
         if (map.acquire[i] != -1) {
           PrimExpr acquire_barrier_id = stage_ + num_barriers_ + num_stages_ * map.acquire[i];
           PrimExpr parity =
               map.is_loop_dependency(map.acquire[i]) ? bitwise_xor(parity_, 1) : parity_;
-          new_body.push_back(makeParityWait(acquire_barrier_id, parity));
+          block_stmt.push_back(makeParityWait(acquire_barrier_id, parity));
         }
-        new_body.push_back(seq_transformed[i]);
+        block_stmt.push_back(seq_transformed[i]);
+        // new_body.push_back(MakeGroupBlock(block_stmt.size() == 1 ? block_stmt[0] : SeqStmt(std::move(block_stmt)), annotations));
         if (map.release_after[i]) {
           PrimExpr release_barrier_id = stage_ + num_barriers_ + num_stages_ * map.release[i];
-          new_body.push_back(makeArriveBarrier(release_barrier_id));
+          block_stmt.push_back(makeArriveBarrier(release_barrier_id));
           for (int j = 0; j < num_stages_; j++) {
             released_barrier_.insert(j + num_barriers_ + num_stages_ * map.release[i]);
           }
+          // Update the pipeline info
+          // Todo: handle sync
+        }
+        new_body.push_back(MakeGroupBlock(block_stmt.size() == 1 ? block_stmt[0] : SeqStmt(std::move(block_stmt)), annotations));
+      }
+      // Filter out the producer stmts
+      int cur_id = 0;
+      PipelineInfo new_pipeline_info;
+      for (int i = 0; i < static_cast<int>(pipeline_info_.op_infos.size()); i++) {
+        auto op_info = pipeline_info_.op_infos[i];
+        bool is_producer = false;
+        for (int j = 0; j < op_info.group_size; j++) {
+          if (marker_.GetRole(op->seq[cur_id]) == Role::kProducer) {
+            is_producer = true;
+          }
+          cur_id++;
+        }
+        if (is_producer) {
+          ICHECK(op_info.group_size == 1);
+        } else {
+          new_pipeline_info.op_infos.push_back(op_info);
         }
       }
+      pipeline_info_ = new_pipeline_info;
     }
 
     num_barriers_ += map.patterns.size() * num_stages_;
@@ -527,27 +562,66 @@ class WSCodeEmitter : public StmtMutator {
       ICHECK(num_stages_ == 1) << "Nested pipeline not supported.";
     }
 
+    Array<Array<Integer>> group_info_array;
+    Array<Integer> order_info_array;
+    Array<Integer> stage_info_array;
+   
+    auto group_anno = op->annotations.Get("tl_pipeline_group");
+    if (group_anno.defined()) {
+      group_info_array = Downcast<Array<Array<Integer>>>(group_anno);
+    }
+    auto order_anno = op->annotations.Get("tl_pipeline_order");
+    if (order_anno.defined()) {
+      order_info_array = Downcast<Array<Integer>>(order_anno);
+    }
+    auto stage_anno = op->annotations.Get("tl_pipeline_stage");
+    if (stage_anno.defined()) {
+      stage_info_array = Downcast<Array<Integer>>(stage_anno);
+    }
+
+    PipelineInfo pipeline_info(group_info_array, order_info_array, stage_info_array);
+    if (pipeline_info.op_infos.size() > 0) {
+      ICHECK(pipeline_info_.op_infos.size() == 0) << "Nested pipeline not supported.";
+    }
+
     PrimExpr parity_before = std::move(parity_);
     PrimExpr stage_before = std::move(stage_);
     int num_stages_before = num_stages_;
+    PipelineInfo pipeline_info_before = pipeline_info_;
 
     num_stages_ = num_stages;
+    pipeline_info_ = pipeline_info;
     stage_ = FloorMod(op->loop_var - op->min, num_stages);
     parity_ =
         FloorMod(parity_before * op->extent + FloorDiv(op->loop_var - op->min, num_stages), 2);
 
     auto result = FilterByRole(op);
 
+    Stmt grouped_for_node;
+    if (result.as<ForNode>() && group_anno.defined() && group_info_array.size() > 0 && !is_emitting_producer_) {
+      GroupOpRewriter group_op_rewriter(pipeline_info_);
+      auto for_node = Downcast<For>(result);
+      grouped_for_node = group_op_rewriter(for_node);
+    }
+
     parity_ = std::move(parity_before);
     stage_ = std::move(stage_before);
     num_stages_ = num_stages_before;
+    pipeline_info_ = pipeline_info_before;
 
     // remove pipeline annotation
     auto for_node = result.as<For>();
     if (result.as<ForNode>()) {
       auto for_node = Downcast<For>(result);
       for_node.CopyOnWrite()->annotations.erase("num_stages");
-      return for_node;
+      if (is_emitting_producer_ || group_info_array.size() == 0) {
+        for_node.CopyOnWrite()->annotations.erase("tl_pipeline_order");
+        for_node.CopyOnWrite()->annotations.erase("tl_pipeline_stage");
+      }
+      if (is_emitting_producer_ || !group_anno.defined() ||group_info_array.size() == 0) {
+        return for_node;
+      }
+      return grouped_for_node;
     }
     return result;
   }
@@ -732,14 +806,14 @@ class WSCodeEmitter : public StmtMutator {
   PrimExpr stage_ = 0;
   int num_stages_ = 1;
   Var thread_var_;
-  friend class WarpSpecializedPipeline;
+  PipelineInfo pipeline_info_;
+  friend class WarpSpecializedRewriter;
 };
 
-class WarpSpecializedPipeline : public StmtExprMutator {
+class WarpSpecializedRewriter : public StmtExprMutator {
  public:
   static PrimFunc Substitute(PrimFunc f) {
-    f = MultiVersionBufferRewriter::Rewrite(f);
-    auto T = WarpSpecializedPipeline();
+    auto T = WarpSpecializedRewriter();
     T.buffer_lca_ = DetectBufferAccessLCA(f);
     for (auto [buffer, _] : T.buffer_lca_) T.buffer_data_to_buffer_.Set(buffer->data, buffer);
     f.CopyOnWrite()->body = T(f->body);
@@ -751,8 +825,9 @@ class WarpSpecializedPipeline : public StmtExprMutator {
     if (op->attr_key == tir::attr::thread_extent &&
         Downcast<IterVar>(op->node)->thread_tag == "threadIdx.x") {
       thread_iv_ = Downcast<IterVar>(op->node);
+      need_update_thread_extent_ = false;
       AttrStmt attr_stmt = Downcast<AttrStmt>(StmtExprMutator::VisitStmt_(op));
-      if (updated_thread_extent_.defined()) {
+      if (need_update_thread_extent_) {
         thread_iv_.CopyOnWrite()->dom = {0, updated_thread_extent_.value()};
         attr_stmt.CopyOnWrite()->node = thread_iv_;
         attr_stmt.CopyOnWrite()->value = updated_thread_extent_.value();
@@ -764,12 +839,27 @@ class WarpSpecializedPipeline : public StmtExprMutator {
     }
   }
 
+  // If users define a thread binding, we will replace the thread binding with threadIdx.x
+  // We require the thread binding is threadIdx.x, and the extent is the same as the thread extent
+  Stmt VisitStmt_(const ForNode* op) final {
+    ICHECK(thread_iv_.defined());
+    For for_node = Downcast<For>(StmtExprMutator::VisitStmt_(op));
+    if (for_node->kind == ForKind::kThreadBinding) {
+      ICHECK(for_node->thread_binding.defined());
+      String thread_tag = for_node->thread_binding.value()->thread_tag;
+      ICHECK(thread_tag == "threadIdx.x") << "Only support threadIdx.x";
+      Var thread_iv = Downcast<Var>(for_node->loop_var);
+      Stmt new_body = ThreadIdxRewriter::Rewrite(for_node->body, thread_iv, thread_iv_);
+      return new_body;
+    }
+    return for_node;
+  }
+
   Stmt VisitStmt_(const BlockRealizeNode* op) final {
     BlockRealize block_realize = Downcast<BlockRealize>(StmtExprMutator::VisitStmt_(op));
     if (!thread_iv_.defined()) {
       return block_realize;
     }
-    ICHECK(!updated_thread_extent_.defined());
 
     Block block = block_realize->block;
     WarpSpecializedRoleMarker marker(buffer_data_to_buffer_);
@@ -786,12 +876,20 @@ class WarpSpecializedPipeline : public StmtExprMutator {
 
     PrimExpr consumer_thread_extent = thread_iv_->dom->extent;
     PrimExpr producer_thread_extent = thread_iv_->dom->extent;
-    // Only need one thread for bulk-copy only case
-    if (!marker.HasSimtCopy()) producer_thread_extent = 1;
+    // Need one warp-group for bulk-copy only case
+    if (!marker.HasSimtCopy()) producer_thread_extent = 128;
+
+    // TODO: estimate the correct reg usage.
+    auto inc_reg_stmt = Evaluate(Call(DataType::Handle(), SetMaxNReg(), {240, 1}));
+    auto dec_reg_stmt = Evaluate(Call(DataType::Handle(), SetMaxNReg(), {24, 0}));
+
+    producer_code = SeqStmt({dec_reg_stmt, producer_code});
+    consumer_code = SeqStmt({inc_reg_stmt, consumer_code});
 
     producer_code = ThreadIdxRewriter::Rewrite(producer_code, thread_iv_->var,
                                                thread_iv_->var - consumer_thread_extent);
     updated_thread_extent_ = consumer_thread_extent + producer_thread_extent;
+    need_update_thread_extent_ = true;
 
     ICHECK(producer.num_barriers_ == consumer.num_barriers_)
         << producer.num_barriers_ << " " << consumer.num_barriers_;
@@ -818,25 +916,26 @@ class WarpSpecializedPipeline : public StmtExprMutator {
     return block_realize;
   }
 
-  WarpSpecializedPipeline() = default;
+  WarpSpecializedRewriter() = default;
 
   Map<Var, Buffer> buffer_data_to_buffer_;
   Map<Buffer, Optional<Stmt>> buffer_lca_;
   Map<Buffer, Buffer> buffer_remap_;
   IterVar thread_iv_;
   Optional<PrimExpr> updated_thread_extent_;
+  bool need_update_thread_extent_ = false;
 };
 
 using namespace tir::transform;
 
-tvm::transform::Pass WarpSpecializedPipeline() {
+tvm::transform::Pass WarpSpecialized() {
   auto pass_func = [=](PrimFunc f, IRModule m, PassContext ctx) {
-    return WarpSpecializedPipeline::Substitute(f);
+    return WarpSpecializedRewriter::Substitute(f);
   };
-  return CreatePrimFuncPass(pass_func, 0, "tl.WarpSpecializedPipeline", {});
+  return CreatePrimFuncPass(pass_func, 0, "tl.WarpSpecialized", {});
 }
 
-TVM_REGISTER_GLOBAL("tl.transform.WarpSpecializedPipeline").set_body_typed(WarpSpecializedPipeline);
+TVM_REGISTER_GLOBAL("tl.WarpSpecialized").set_body_typed(WarpSpecialized);
 
 }  // namespace tl
 }  // namespace tvm

@@ -45,6 +45,38 @@ Fragment makeGemmFragment8x8() {
   PrimExpr index = FloorMod(j->var, 2);
   return Fragment({i, j}, {index}, forward_thread, rep);
 }
+/*
+From https://github.com/RadeonOpenCompute/amd_matrix_instruction_calculator
+./matrix_calculator.py --architecture cdna1 --instruction v_mfma_f32_16x16x16f16
+--detail-instruction
+*/
+Fragment makeGemmFragmentAB16x16CDNA() {
+  IterVar i = make_itervar("i", 16);
+  IterVar j = make_itervar("j", 16);
+  IterVar rep = make_itervar("rep", 1);
+  PrimExpr forward_thread = 16 * FloorDiv(j->var, 4) + i;
+  PrimExpr index = FloorMod(j->var, 4);
+  return Fragment({i, j}, {index}, forward_thread, rep);
+}
+
+Fragment makeGemmFragmentAB16x16CDNATransposed() {
+  IterVar i = make_itervar("i", 16);
+  IterVar j = make_itervar("j", 16);
+  IterVar rep = make_itervar("rep", 1);
+  PrimExpr forward_thread = 16 * FloorDiv(i->var, 4) + j;
+  PrimExpr index = FloorMod(i->var, 4);
+  return Fragment({i, j}, {index}, forward_thread, rep);
+}
+
+Fragment makeGemmFragmentC16x16CDNA() {
+  IterVar i = make_itervar("i", 16);
+  IterVar j = make_itervar("j", 16);
+  IterVar rep = make_itervar("rep", 1);
+  PrimExpr forward_thread = 16 * FloorDiv(j->var, 4) + i;
+  PrimExpr index = FloorMod(j->var, 4);
+  return Fragment({i, j}, {index}, forward_thread, rep);
+}
+
 
 Fragment makeGemmFragment8x8Transposed() {
   IterVar i = make_itervar("i", 8);
@@ -52,6 +84,15 @@ Fragment makeGemmFragment8x8Transposed() {
   IterVar rep = make_itervar("rep", 1);
   PrimExpr forward_thread = FloorDiv(i->var, 2) + 4 * j;
   PrimExpr index = FloorMod(i->var, 2);
+  return Fragment({i, j}, {index}, forward_thread, rep);
+}
+
+Fragment makeGemmFragment8x16() {
+  IterVar i = make_itervar("i", 8);
+  IterVar j = make_itervar("j", 16);
+  IterVar rep = make_itervar("rep", 1);
+  PrimExpr forward_thread = FloorDiv(j->var, 4) + 4 * i;
+  PrimExpr index = FloorMod(j->var, 4);
   return Fragment({i, j}, {index}, forward_thread, rep);
 }
 
@@ -80,29 +121,76 @@ Fragment makeGemmFragmentC(const int block_m, const int block_n, const int warp_
   return block_layout;
 }
 
+Fragment makeGemmFragmentCCDNA(const int block_m, const int block_n, const int warp_m, const int warp_n,
+                           const int element_size) {
+  if (element_size == 64) LOG(FATAL) << "Not supported";
+  ICHECK(block_m % warp_m == 0);
+  ICHECK(block_n % warp_n == 0);
+  ICHECK(warp_m % 16 == 0) << "warp_m=" << warp_m;
+  ICHECK(warp_n % 16 == 0) << "warp_n=" << warp_n;
+  auto base_layout = makeGemmFragmentC16x16CDNA()->Repeat({1, 1}, false);
+  auto warp_layout = base_layout->Repeat({warp_m / 16, warp_n / 16}, false, true);
+  auto block_layout = warp_layout->Repeat({block_m / warp_m, block_n / warp_n}, true, false);
+  return block_layout;
+}
+
 Fragment makeGemmFragmentCHopper(const int block_m, const int block_n, const int warp_m,
                                  const int warp_n, const int element_size) {
   ICHECK(block_m % warp_m == 0);
-  ICHECK(block_n == warp_n);
+  // ICHECK(block_n == warp_n);
   ICHECK(warp_m % 16 == 0);
   auto warp_layout =
-      makeGemmFragment8x8()->Repeat({2, block_n / 8}, false, false);     // 16 x N (1 warp)
-  auto block_layout = warp_layout->Repeat({block_m / warp_m, 1}, true);  // 16*Y x N (Y warp)
-  return block_layout->Repeat({warp_m / 16, 1}, false);
+      makeGemmFragment8x8()->Repeat({2, warp_n / 8}, false, false);     // 16 x N (1 warp)
+  auto block_layout = warp_layout->Repeat({block_m / warp_m, block_n / warp_n}, true, false);  // 16*Y x N (Y warp)
+  return block_layout->Repeat({warp_m / 16, 1}, false, false);
 }
 
 Fragment makeGemmFragmentA(const int block_m, const int block_n, const int block_k,
-                           const int warp_m, const int warp_n) {
+                           const int warp_m, const int warp_n, const int element_size) {
   // assume not transposed
   ICHECK(block_m % warp_m == 0);
   ICHECK(block_n % warp_n == 0);
   ICHECK(warp_m % 16 == 0);
   ICHECK(block_k % 16 == 0);
-  auto base_layout = makeGemmFragment8x8()->Repeat({2, 2}, false, false);
-  auto warp_layout = base_layout->Repeat({block_m / warp_m, 1}, true)->Replicate(block_n / warp_n);
-  auto block_layout = warp_layout->Repeat({warp_m / 16, block_k / 16}, false, false);
-  return block_layout;
+  // Only support 8-bit and 16-bit
+  ICHECK(element_size == 8 || element_size == 16);
+  if (element_size == 8) {
+    auto base_layout = makeGemmFragment8x16()->Repeat({2, 2}, false, false);
+    auto warp_layout = base_layout->Repeat({block_m / warp_m, 1}, true)->Replicate(block_n / warp_n);
+    auto block_layout = warp_layout->Repeat({warp_m / 16, block_k / 32}, false, false);
+    return block_layout;
+  } else if (element_size == 16) {
+    auto base_layout = makeGemmFragment8x8()->Repeat({2, 2}, false, false);
+    auto warp_layout = base_layout->Repeat({block_m / warp_m, 1}, true)->Replicate(block_n / warp_n);
+    auto block_layout = warp_layout->Repeat({warp_m / 16, block_k / 16}, false, false);
+    return block_layout;
+  } else {
+    ICHECK(0);
+    return Fragment();
+  }
 }
+
+Fragment makeGemmFragmentACDNA(const int block_m, const int block_n, const int block_k,
+                           const int warp_m, const int warp_n, bool transposed) {
+  // assume not transposed
+  ICHECK(block_m % warp_m == 0);
+  ICHECK(block_n % warp_n == 0);
+  ICHECK(warp_m % 16 == 0);
+  ICHECK(block_k % 16 == 0);
+  if (transposed) {
+    auto base_layout = makeGemmFragmentAB16x16CDNATransposed()->Repeat({1, 1}, false, false);
+    auto warp_layout = base_layout->Repeat({warp_m / 16, block_k / 16}, false, false);
+    auto block_layout = warp_layout->Repeat({block_m / warp_m, 1}, true, true)->Replicate(block_n / warp_n);
+    return block_layout;
+  } else {
+    auto base_layout = makeGemmFragmentAB16x16CDNA()->Repeat({1, 1}, false, false);
+    auto warp_layout = base_layout->Repeat({warp_m / 16, block_k / 16}, false, false);
+    auto block_layout =
+        warp_layout->Repeat({block_m / warp_m, 1}, true, true)->Replicate(block_n / warp_n);
+    return block_layout;
+  }
+}
+
 
 Fragment makeGemmFragmentB(const int block_m, const int block_n, const int block_k,
                            const int warp_m, const int warp_n) {
@@ -219,6 +307,29 @@ Layout makeFullBankSwizzleLayout(int stride, int continuous, int element_size) {
   return Layout(Array<PrimExpr>{stride, continuous}, {tc, ts, index});
 }
 
+// Detail implementation please ref to bitblas::tl::mfma_layout::make_mfma_swizzle_layout
+Layout makeMatrixCoreSwizzleLayout(int stride, int continuous, int element_size, int kPack=1) {
+  const int numBanks = 32;
+  const int bankBitWidth = 32;
+  const int SIMDWidth = 16;
+  const int vecSize = 4 * kPack;
+  const int innerDimLength = continuous;
+  const int typeWidthInBit = element_size;
+
+  const int elemsPerOneBanksRow = (numBanks * bankBitWidth) / typeWidthInBit;
+  const int perPhase = std::max(1, elemsPerOneBanksRow / innerDimLength);
+  const int maxPhase = std::min(SIMDWidth / perPhase, innerDimLength / vecSize);
+
+  IterVar row = make_itervar("row", stride);
+  IterVar col = make_itervar("col", continuous);
+  PrimExpr phase = FloorMod(row / perPhase, maxPhase);
+  PrimExpr colOffSwizzled = ((col / vecSize) ^ phase) * vecSize;
+  PrimExpr colOffOrdered = FloorMod(col, vecSize);
+  PrimExpr colOff = colOffSwizzled + colOffOrdered;
+
+  return Layout(Array{row, col}, {row, colOff});
+}
+
 Layout makeGemmABLayoutF64_Kinner(int stride, int continuous) {
   // Swizzle<2, 0, 4>
   Var i = InputPlaceholder(0);
@@ -243,6 +354,13 @@ Layout makeGemmABLayoutF64_Kouter(int stride, int continuous) {
   PrimExpr swizzled_c = FloorMod(c, 4) + xor4x4(FloorDiv(c, 4), s) * 4;
   PrimExpr index = swizzled_c + s * 16;
   return Layout(Array<PrimExpr>{stride, continuous}, {tc, ts, index});
+}
+
+// The Default Layout for Tensor Access
+Layout makeGemmLayoutLinear(int stride, int continuous) {
+  IterVar i = make_itervar("i", stride);
+  IterVar j = make_itervar("j", continuous);
+  return Layout(Array{i, j}, {i * continuous + j});
 }
 
 Layout makeGemmABLayoutPadded(int stride, int continuous, int element_size) {
@@ -340,6 +458,15 @@ Layout makeGemmABLayout(int stride, int continuous, int element_size, int kfacto
     return makeFullBankSwizzleLayout(stride, continuous, element_size);
   else if (continuous % (vector_size * 4) == 0)
     return makeHalfBankSwizzleLayout(stride, continuous, element_size);
+  else {
+    return makeGemmABLayoutPadded(stride, continuous, element_size);
+  }
+}
+
+Layout makeGemmABLayoutCDNA(int stride, int continuous, int element_size, int kPack) {
+  int vector_size = 128 / element_size;
+  if (continuous % (vector_size * 4) == 0)
+    return makeMatrixCoreSwizzleLayout(stride, continuous, element_size, kPack);
   else {
     return makeGemmABLayoutPadded(stride, continuous, element_size);
   }

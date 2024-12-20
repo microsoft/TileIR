@@ -123,6 +123,38 @@ def ThreadPartialSync(storage_scope: str):
     """
     return _ffi_api.ThreadPartialSync(storage_scope)  # type: ignore
 
+def MultiVersionBuffer():
+    """WarpSpecializedPipeline
+
+    Returns
+    -------
+    fpass : tvm.transform.Pass
+        The result pass
+    """
+    return _ffi_api.MultiVersionBuffer()  # type: ignore
+
+
+def WarpSpecialized():
+    """WarpSpecializedPipeline
+
+    Returns
+    -------
+    fpass : tvm.transform.Pass
+        The result pass
+    """
+    return _ffi_api.WarpSpecialized()  # type: ignore
+
+
+def InjectFenceProxy():
+    """InjectFenceProxy
+
+    Returns
+    -------
+    fpass : tvm.transform.Pass
+        The result pass
+    """
+    return _ffi_api.InjectFenceProxy()  # type: ignore
+
 
 def Simplify():
     """Simplify
@@ -133,3 +165,24 @@ def Simplify():
         The result pass
     """
     return _ffi_api.Simplify()  # type: ignore
+
+
+def LegalizeVectorizedLoop():
+    """LegalizeLoopVectorize
+
+    Returns
+    -------
+    fpass : tvm.transform.Pass
+        The result pass
+    """
+    return _ffi_api.LegalizeVectorizedLoop()  # type: ignore
+
+def LegalizeSafeMemoryAccess():
+    """LegalizeLoopVectorize
+
+    Returns
+    -------
+    fpass : tvm.transform.Pass
+        The result pass
+    """
+    return _ffi_api.LegalizeSafeMemoryAccess()  # type: ignore

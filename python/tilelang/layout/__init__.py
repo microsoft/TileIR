@@ -25,7 +25,6 @@ from tilelang import _ffi_api
 
 @tvm._ffi.register_object("tl.Layout")
 class Layout(Node):
-
     def __init__(self, shape, forward_fn):
         forward_vars = []
         for idx, size in enumerate(shape):
@@ -71,11 +70,7 @@ class Fragment(Layout):
             thread_replicate = None
             forward_thread = forward_thread_fn(*vars)
         self.__init_handle_by_constructor__(
-            _ffi_api.Fragment,
-            forward_vars,
-            forward_index,
-            forward_thread,
-            thread_replicate,
+            _ffi_api.Fragment, forward_vars, forward_index, forward_thread, thread_replicate
         )
 
     @property
@@ -95,7 +90,5 @@ class Fragment(Layout):
 def make_swizzled_layout(buffer: tvm.tir.Buffer):
     assert len(buffer.shape) == 2
     return _ffi_api.make_swizzled_layout(
-        int(buffer.shape[0]),
-        int(buffer.shape[1]),
-        int(tvm.DataType(buffer.dtype).bits),
+        int(buffer.shape[0]), int(buffer.shape[1]), int(tvm.DataType(buffer.dtype).bits)
     )

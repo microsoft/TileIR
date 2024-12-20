@@ -34,6 +34,7 @@
 #include "../op/parallel.h"
 #include "loop_partition.h"
 #include "loop_vectorize.h"
+#include "common/loop_fusion_utils.h"
 
 namespace tvm {
 namespace tl {
@@ -62,8 +63,9 @@ class BufferUseDefCollector : public StmtExprVisitor {
 
     auto run_infer_step = [&](int cur_infer_id, InferLevel level, bool update_queue) {
       auto& next = infer_list_[cur_infer_id];
+      auto iter_var = thread_var_vec_[cur_infer_id];
       auto updates = next->InferLayout(
-          LayoutInferArgs{target_, static_cast<size_t>(*as_const_int(thread_var_->dom->extent)),
+          LayoutInferArgs{target_, static_cast<size_t>(*as_const_int(iter_var->dom->extent)),
                           layout_map},
           level);
       for (const auto& [buffer, layout] : updates) {
@@ -141,6 +143,9 @@ class BufferUseDefCollector : public StmtExprVisitor {
  private:
   void VisitExpr_(const CallNode* op) final {
     StmtExprVisitor::VisitExpr_(op);
+    // Do not analysis the call node to the global function.
+    if (op->op.as<GlobalVarNode>()) return;
+
     auto p = ParseOperator(GetRef<Call>(op), buffer_data_to_buffer_);
     if (p != nullptr) {
       for (const auto& arg : op->args) {
@@ -149,6 +154,7 @@ class BufferUseDefCollector : public StmtExprVisitor {
         }
       }
       infer_list_.push_back(std::move(p));
+      thread_var_vec_.push_back(thread_var_);
     }
   }
 
@@ -176,6 +182,7 @@ class BufferUseDefCollector : public StmtExprVisitor {
         addToUseList(buffer);
       }
       infer_list_.push_back(std::move(infer));
+      thread_var_vec_.push_back(thread_var_);
     } else {
       StmtExprVisitor::VisitStmt(op->body);
     }
@@ -211,6 +218,7 @@ class BufferUseDefCollector : public StmtExprVisitor {
   std::vector<std::unique_ptr<Operator>> infer_list_;
   std::unordered_map<Buffer, std::vector<int>, ObjectPtrHash, ObjectPtrEqual> use_list_;
   IterVar thread_var_;
+  std::vector<IterVar> thread_var_vec_;
   Target target_;
   LayoutMap annotated_layout_map_;
 };
@@ -218,19 +226,20 @@ class BufferUseDefCollector : public StmtExprVisitor {
 class LayoutInferencer : public IRMutatorWithAnalyzer {
  public:
   static PrimFunc Substitute(PrimFunc f) {
+    arith::Analyzer analyzer;
+    PrimFuncNode* fptr = f.CopyOnWrite();
+    fptr->body = ParallelLoopFuser::Fuse(f->body);
     BufferUseDefCollector collector;
     collector.Collect(f);
     auto result = collector.Run();
-    arith::Analyzer analyzer;
     LayoutInferencer substituter(result, &analyzer);
-    PrimFuncNode* fptr = f.CopyOnWrite();
     fptr->body = substituter.VisitStmt(f->body);
     return f;
   }
 
  private:
   LayoutInferencer(const LayoutInferenceResult result, arith::Analyzer* analyzer)
-      : arith::IRMutatorWithAnalyzer(analyzer), result_(result){};
+      : arith::IRMutatorWithAnalyzer(analyzer), result_(result) {};
 
   Stmt VisitStmt_(const BlockNode* op) final {
     Block block = Downcast<Block>(IRMutatorWithAnalyzer::VisitStmt_(op));
@@ -285,7 +294,8 @@ tvm::transform::Pass LayoutInference() {
   return CreatePrimFuncPass(pass_func, 0, "tl.LayoutInference", {});
 }
 
-TVM_REGISTER_GLOBAL("tl.transform.LayoutInference").set_body_typed(LayoutInference);
+TVM_REGISTER_GLOBAL("tl.transform.LayoutInference")
+    .set_body_typed(LayoutInference);
 
 }  // namespace tl
 }  // namespace tvm
