@@ -1,19 +1,5 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 # pylint: disable=invalid-name
 # modified from apache tvm python/tvm/contrib/nvcc.py
 """Utility to invoke nvcc compiler in the system"""
@@ -30,7 +16,12 @@ from tvm._ffi.base import py_str
 from tvm.contrib import utils
 
 
-def compile_cuda(code, target_format="ptx", arch=None, options=None, path_target=None, verbose=False):
+def compile_cuda(code,
+                 target_format="ptx",
+                 arch=None,
+                 options=None,
+                 path_target=None,
+                 verbose=False):
     """Compile cuda code with NVCC from env.
 
     Parameters
@@ -63,8 +54,7 @@ def compile_cuda(code, target_format="ptx", arch=None, options=None, path_target
         #   "-gencode", "arch=compute_70,code=sm_70"
         # ]
         compute_version = "".join(
-            get_target_compute_version(Target.current(allow_none=True)).split(".")
-        )
+            get_target_compute_version(Target.current(allow_none=True)).split("."))
         arch = ["-gencode", f"arch=compute_{compute_version},code=sm_{compute_version}"]
 
     temp = utils.tempdir()
@@ -75,11 +65,7 @@ def compile_cuda(code, target_format="ptx", arch=None, options=None, path_target
     temp_target = temp.relpath(f"{file_name}.{target_format}")
 
     pass_context = tvm.get_global_func("transform.GetCurrentPassContext")()
-    kernels_output_dir = (
-        pass_context.config["cuda.kernels_output_dir"]
-        if "cuda.kernels_output_dir" in pass_context.config
-        else None
-    )
+    kernels_output_dir = (pass_context.config.get("cuda.kernels_output_dir", None))
     if kernels_output_dir is not None:
         if not os.path.isdir(kernels_output_dir):
             os.makedirs(kernels_output_dir)
@@ -270,7 +256,7 @@ def callback_libdevice_path(arch):
     try:
         return find_libdevice_path(arch)
     except RuntimeError:
-        warnings.warn("Cannot find libdevice path")
+        warnings.warn("Cannot find libdevice path", stacklevel=2)
         return ""
 
 
@@ -308,10 +294,8 @@ def get_target_compute_version(target=None):
     if tvm.cuda(0).exist:
         return tvm.cuda(0).compute_version
 
-    raise ValueError(
-        "No CUDA architecture was specified or GPU detected."
-        "Try specifying it by adding '-arch=sm_xx' to your target."
-    )
+    raise ValueError("No CUDA architecture was specified or GPU detected."
+                     "Try specifying it by adding '-arch=sm_xx' to your target.")
 
 
 def parse_compute_version(compute_version):
@@ -336,7 +320,7 @@ def parse_compute_version(compute_version):
         return major, minor
     except (IndexError, ValueError) as err:
         # pylint: disable=raise-missing-from
-        raise RuntimeError("Compute version parsing error: " + str(err))
+        raise RuntimeError("Compute version parsing error") from err
 
 
 def have_fp16(compute_version):
@@ -350,12 +334,10 @@ def have_fp16(compute_version):
     major, minor = parse_compute_version(compute_version)
     # fp 16 support in reference to:
     # https://docs.nvidia.com/cuda/cuda-c-programming-guide/#arithmetic-instructions
-    if major == 5 and minor == 3:
-        return True
-    if major >= 6:
-        return True
-
-    return False
+    conditions = [False]
+    conditions.append(major == 5 and minor >= 3)
+    conditions.append(major >= 6)
+    return any(conditions)
 
 
 def have_int8(compute_version):
@@ -367,10 +349,7 @@ def have_int8(compute_version):
         compute capability of a GPU (e.g. "6.1")
     """
     major, _ = parse_compute_version(compute_version)
-    if major >= 6:
-        return True
-
-    return False
+    return major >= 6
 
 
 def have_tensorcore(compute_version=None, target=None):
@@ -392,27 +371,22 @@ def have_tensorcore(compute_version=None, target=None):
             if target is None or "arch" not in target.attrs:
                 warnings.warn(
                     "Tensorcore will be disabled due to no CUDA architecture specified."
-                    "Try specifying it by adding '-arch=sm_xx' to your target."
-                )
+                    "Try specifying it by adding '-arch=sm_xx' to your target.",
+                    stacklevel=2)
                 return False
             compute_version = target.attrs["arch"]
             # Compute version will be in the form "sm_{major}{minor}"
             major, minor = compute_version.split("_")[1]
             compute_version = major + "." + minor
     major, _ = parse_compute_version(compute_version)
-    if major >= 7:
-        return True
-
-    return False
+    return major >= 7
 
 
 def have_cudagraph():
     """Either CUDA Graph support is provided"""
     try:
         cuda_ver = get_cuda_version()
-        if cuda_ver < (10, 0):
-            return False
-        return True
+        return not cuda_ver < (10, 0)
     except RuntimeError:
         return False
 
@@ -427,10 +401,7 @@ def have_bf16(compute_version):
         compute capability of a GPU (e.g. "8.0")
     """
     major, _ = parse_compute_version(compute_version)
-    if major >= 8:
-        return True
-
-    return False
+    return major >= 8
 
 
 @tvm._ffi.register_func("tvm.contrib.nvcc.supports_fp8", override=True)
@@ -443,9 +414,8 @@ def have_fp8(compute_version):
         GPU capability
     """
     major, minor = parse_compute_version(compute_version)
-    # fp8 is suppored in Ada Lovelace (8.9) or later architectures.
-    if major == 8 and minor == 9:
-        return True
-    if major >= 9:
-        return True
-    return False
+    # fp8 is supported in Ada Lovelace (8.9) or later architectures.
+    conditions = [False]
+    conditions.append(major == 8 and minor >= 9)
+    conditions.append(major >= 9)
+    return any(conditions)

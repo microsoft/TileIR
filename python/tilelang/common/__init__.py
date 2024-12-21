@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 from enum import IntEnum
 
+
 class TransformKind(IntEnum):
     NonTransform = 0
     InterWarpTransform = 1

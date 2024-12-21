@@ -89,6 +89,7 @@ def matmul(
 
     return main
 
+
 def run_gemm(
     M,
     N,
@@ -136,6 +137,7 @@ def run_gemm(
         return C
 
     mod.assert_allclose(ref_program)
+
 
 @tvm.testing.requires_package("bitblas")
 def tl_matmul_with_ladder_weight_only_transform_block_reduce_int4(
@@ -426,6 +428,7 @@ def assert_tl_matmul_with_ladder_weight_only_transform_block_reduce_int4_correct
     print("Ref C: ", ref_c)
     print("C: ", C)
     torch.testing.assert_close(C, ref_c, rtol=1e-2, atol=1e-2)
+
 
 @tilelang.testing.requires_package("bitblas")
 def test_run_dequantize_gemm():

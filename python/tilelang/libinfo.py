@@ -1,4 +1,7 @@
-"""Library information. This is a standalone file that can be used to get various info. Modified from: https://github.com/mlc-ai/mlc-llm/blob/main/python/mlc_llm/libinfo.py
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+"""Library information. This is a standalone file that can be used to get various info. 
+Modified from: https://github.com/mlc-ai/mlc-llm/blob/main/python/mlc_llm/libinfo.py
 """
 
 #! pylint: disable=protected-access
@@ -60,9 +63,8 @@ def find_lib_path(name, optional=False):
     dll_paths = get_dll_directories()
     lib_dll_path = [os.path.join(p, lib_name) for p in dll_paths]
     lib_found = [p for p in lib_dll_path if os.path.exists(p) and os.path.isfile(p)]
-    if not lib_found:
-        if not optional:
-            message = (f"Cannot find libraries: {lib_name}\n" + "List of candidates:\n" +
-                       "\n".join(lib_dll_path))
-            raise RuntimeError(message)
+    if not lib_found and not optional:
+        message = (f"Cannot find libraries: {lib_name}\n" + "List of candidates:\n" +
+                   "\n".join(lib_dll_path))
+        raise RuntimeError(message)
     return lib_found

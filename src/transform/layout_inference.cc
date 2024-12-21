@@ -119,7 +119,7 @@ class BufferUseDefCollector : public StmtExprVisitor {
     for (auto& base_infer : infer_list_) {
       if (auto for_infer = dynamic_cast<ParallelOp*>(base_infer.get())) {
         ICHECK(for_infer->GetLoopLayout().defined())
-            << "The Layout for Parallel for can not be infered correctly : \n"
+            << "The Layout for Parallel for can not be inferred correctly : \n"
             << for_infer->GetRoot();
         for_map.Set(for_infer->GetRoot(), for_infer->GetLoopLayout());
         if (auto predicate = for_infer->GetPredicate(thread_var_->var))

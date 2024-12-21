@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
 /*
  * Copyright 1993-2023 NVIDIA Corporation.  All rights reserved.
  *
@@ -777,7 +779,7 @@ typedef enum CUdevice_attribute_enum {
     CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_WAIT_VALUE_NOR_V1 = 94,              /**< Deprecated, along with v1 MemOps API, ::CU_STREAM_WAIT_VALUE_NOR is supported. */
     CU_DEVICE_ATTRIBUTE_COOPERATIVE_LAUNCH = 95,                            /**< Device supports launching cooperative kernels via ::cuLaunchCooperativeKernel */
     CU_DEVICE_ATTRIBUTE_COOPERATIVE_MULTI_DEVICE_LAUNCH = 96,               /**< Deprecated, ::cuLaunchCooperativeKernelMultiDevice is deprecated. */
-    CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN = 97,             /**< Maximum optin shared memory per block */
+    CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN = 97,             /**< Maximum option shared memory per block */
     CU_DEVICE_ATTRIBUTE_CAN_FLUSH_REMOTE_WRITES = 98,                       /**< The ::CU_STREAM_WAIT_VALUE_FLUSH flag and the ::CU_STREAM_MEM_OP_FLUSH_REMOTE_WRITES MemOp are supported on the device. See \ref CUDA_MEMOP for additional details. */
     CU_DEVICE_ATTRIBUTE_HOST_REGISTER_SUPPORTED = 99,                       /**< Device supports host memory registration via ::cudaHostRegister. */
     CU_DEVICE_ATTRIBUTE_PAGEABLE_MEMORY_ACCESS_USES_HOST_PAGE_TABLES = 100, /**< Device accesses pageable memory via the host's page tables. */
@@ -1415,8 +1417,8 @@ typedef enum CUjit_option_enum
 
      /**
      * Maximum number threads in a thread block, computed as the product of
-     * the maximum extent specifed for each dimension of the block. This limit
-     * is guaranteed not to be exeeded in any invocation of the kernel. Exceeding
+     * the maximum extent specific for each dimension of the block. This limit
+     * is guaranteed not to be exceeded in any invocation of the kernel. Exceeding
      * the the maximum number of threads results in runtime error or kernel launch
      * failure. For kernels already using PTX directive .maxntid, this option will
      * be ignored by default. Use ::CU_JIT_OVERRIDE_DIRECTIVE_VALUES to let this
@@ -1846,7 +1848,7 @@ typedef enum CUgraphDependencyType_enum {
  */
 typedef struct CUgraphEdgeData_st {
     unsigned char from_port; /**< This indicates when the dependency is triggered from the upstream
-                                  node on the edge. The meaning is specfic to the node type. A value
+                                  node on the edge. The meaning is specific to the node type. A value
                                   of 0 in all cases means full completion of the upstream node, with
                                   memory visibility to the downstream node or portion thereof
                                   (indicated by \c to_port).
@@ -2196,7 +2198,7 @@ typedef enum CUdriverProcAddress_flags_enum {
  * Flags to indicate search status. For more details see ::cuGetProcAddress
  */
 typedef enum CUdriverProcAddressQueryResult_enum {
-    CU_GET_PROC_ADDRESS_SUCCESS                = 0,  /**< Symbol was succesfully found */
+    CU_GET_PROC_ADDRESS_SUCCESS                = 0,  /**< Symbol was successfully found */
     CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND       = 1,  /**< Symbol was not found in search */
     CU_GET_PROC_ADDRESS_VERSION_NOT_SUFFICIENT = 2   /**< Symbol was found but version supplied was not sufficient */
 }  CUdriverProcAddressQueryResult;
@@ -2239,7 +2241,7 @@ typedef enum CUlibraryOption_enum
     CU_LIBRARY_HOST_UNIVERSAL_FUNCTION_AND_DATA_TABLE = 0,
 
     /**
-     * Specifes that the argument \p code passed to ::cuLibraryLoadData() will be preserved.
+     * Specifies that the argument \p code passed to ::cuLibraryLoadData() will be preserved.
      * Specifying this option will let the driver know that \p code can be accessed at any point
      * until ::cuLibraryUnload(). The default behavior is for the driver to allocate and
      * maintain its own copy of \p code. Note that this is only a memory usage optimization
@@ -2543,7 +2545,7 @@ typedef enum cudaError_enum {
     /**
      * This indicates an attempt was made to introspect an object in a way that
      * would discard semantically important information. This is either due to
-     * the object using funtionality newer than the API version used to
+     * the object using functionality newer than the API version used to
      * introspect it or omission of optional return arguments.
      */
     CUDA_ERROR_LOSSY_QUERY                    = 402,
@@ -2877,7 +2879,7 @@ typedef enum cudaError_enum {
     CUDA_ERROR_INVALID_CLUSTER_SIZE           = 912,
 
     /**
-     * Indiciates a function handle is not loaded when calling an API that requires
+     * Indicates a function handle is not loaded when calling an API that requires
      * a loaded function.
     */
     CUDA_ERROR_FUNCTION_NOT_LOADED            = 913,
@@ -5550,7 +5552,7 @@ CUresult CUDAAPI cuDevicePrimaryCtxRelease(CUdevice dev);
 /**
  * \brief Set flags for the primary context
  *
- * Sets the flags for the primary context on the device overwriting perviously
+ * Sets the flags for the primary context on the device overwriting previously
  * set ones.
  *
  * The three LSBs of the \p flags parameter can be used to control how the OS
@@ -7742,7 +7744,7 @@ CUresult CUDAAPI cuLibraryGetGlobal(CUdeviceptr *dptr, size_t *bytes, CUlibrary 
  * requested name \p name exists, the call returns ::CUDA_ERROR_NOT_FOUND. One of the parameters
  * \p dptr or \p bytes (not both) can be NULL in which case it is ignored.
  * Note that managed memory for library \p library is shared across devices and is registered
- * when the library is loaded into atleast one context.
+ * when the library is loaded into at least one context.
  *
  * \note The API requires a CUDA context to be present and initialized on at least one device.
  * If no context is present, the call returns ::CUDA_ERROR_NOT_FOUND.
@@ -8221,7 +8223,7 @@ CUresult CUDAAPI cuMemAllocPitch(CUdeviceptr *dptr, size_t *pPitch, size_t Width
  * by a previous call to one of the following memory allocation APIs - ::cuMemAlloc(), 
  * ::cuMemAllocPitch(), ::cuMemAllocManaged(), ::cuMemAllocAsync(), ::cuMemAllocFromPoolAsync()
  *
- * Note - This API will not perform any implict synchronization when the pointer was allocated with
+ * Note - This API will not perform any implicit synchronization when the pointer was allocated with
  * ::cuMemAllocAsync or ::cuMemAllocFromPoolAsync. Callers must ensure that all accesses to the
  * pointer have completed before invoking ::cuMemFree. For best performance and memory reuse, users
  * should use ::cuMemFreeAsync to free memory allocated via the stream ordered memory allocator.
@@ -12864,7 +12866,7 @@ CUresult CUDAAPI cuMemPoolImportPointer(CUdeviceptr *ptr_out, CUmemoryPool pool,
  * multicast object via ::cuMulticastAddDevice. Memory can be bound on each
  * participating device via either ::cuMulticastBindMem or ::cuMulticastBindAddr.
  * Multicast objects can be mapped into a device's virtual address space using
- * the virtual memmory management APIs (see ::cuMemMap and ::cuMemSetAccess).
+ * the virtual memory management APIs (see ::cuMemMap and ::cuMemSetAccess).
  *
  * \section CUDA_MULTICAST_support Supported Platforms
  *
@@ -12965,7 +12967,7 @@ CUresult CUDAAPI cuMulticastAddDevice(CUmemGenericAllocationHandle mcHandle, CUd
  * The \p size + \p memOffset must be smaller than the size of the allocated
  * memory. Similarly the \p size + \p mcOffset must be smaller than the size
  * of the multicast object.
- * The memory allocation must have beeen created on one of the devices
+ * The memory allocation must have been created on one of the devices
  * that was added to the multicast team via ::cuMulticastAddDevice.
  * Externally shareable as well as imported multicast objects can be bound only
  * to externally shareable memory.
@@ -13013,7 +13015,7 @@ CUresult CUDAAPI cuMulticastBindMem(CUmemGenericAllocationHandle mcHandle, size_
  * The \p size must be smaller than the size of the allocated memory.
  * Similarly the \p size + \p mcOffset must be smaller than the total size
  * of the multicast object.
- * The memory allocation must have beeen created on one of the devices
+ * The memory allocation must have been created on one of the devices
  * that was added to the multicast team via ::cuMulticastAddDevice.
  * Externally shareable as well as imported multicast objects can be bound only
  * to externally shareable memory.
@@ -13475,7 +13477,7 @@ CUresult CUDAAPI cuMemPrefetchAsync(CUdeviceptr devPtr, size_t count, CUdevice d
  * Applications can request prefetching memory to a specific host NUMA node by specifying
  * ::CU_MEM_LOCATION_TYPE_HOST_NUMA for ::CUmemLocation::type and a valid host NUMA node id in ::CUmemLocation::id
  * Users can also request prefetching memory to the host NUMA node closest to the current thread's CPU by specifying
- * ::CU_MEM_LOCATION_TYPE_HOST_NUMA_CURRENT for ::CUmemLocation::type. Note when ::CUmemLocation::type is etiher
+ * ::CU_MEM_LOCATION_TYPE_HOST_NUMA_CURRENT for ::CUmemLocation::type. Note when ::CUmemLocation::type is either
  * ::CU_MEM_LOCATION_TYPE_HOST OR ::CU_MEM_LOCATION_TYPE_HOST_NUMA_CURRENT, ::CUmemLocation::id will be ignored.
  *
  * The start address and end address of the memory range will be rounded down and rounded up
@@ -13711,10 +13713,10 @@ CUresult CUDAAPI cuMemAdvise(CUdeviceptr devPtr, size_t count, CUmem_advise advi
  * if the preferred location is set as device memory, then the page will continue to thrash indefinitely.
  * If ::CU_MEM_ADVISE_SET_READ_MOSTLY is also set on this memory region or any subset of it, then the
  * policies associated with that advice will override the policies of this advice, unless read accesses from
- * \p location will not result in a read-only copy being created on that procesor as outlined in description for
+ * \p location will not result in a read-only copy being created on that processor as outlined in description for
  * the advice ::CU_MEM_ADVISE_SET_READ_MOSTLY.
  * If the memory region refers to valid system-allocated pageable memory, and ::CUmemLocation::type is CU_MEM_LOCATION_TYPE_DEVICE
- * then ::CUmemLocation::id must be a valid device that has a non-zero alue for the device attribute ::CU_DEVICE_ATTRIBUTE_PAGEABLE_MEMORY_ACCESS.
+ * then ::CUmemLocation::id must be a valid device that has a non-zero value for the device attribute ::CU_DEVICE_ATTRIBUTE_PAGEABLE_MEMORY_ACCESS.
  *
  * - ::CU_MEM_ADVISE_UNSET_PREFERRED_LOCATION: Undoes the effect of ::CU_MEM_ADVISE_SET_PREFERRED_LOCATION
  * and changes the preferred location to none. The \p location argument is ignored for this advice.
@@ -16205,7 +16207,7 @@ CUresult CUDAAPI cuStreamBatchMemOp(CUstream stream, unsigned int count, CUstrea
  * - ::CU_FUNC_ATTRIBUTE_CLUSTER_SCHEDULING_POLICY_PREFERENCE: The block
  *   scheduling policy of a function. The value type is CUclusterSchedulingPolicy.
  *
- * With a few execeptions, function attributes may also be queried on unloaded
+ * With a few exceptions, function attributes may also be queried on unloaded
  * function handles returned from ::cuModuleEnumerateFunctions.
  * ::CUDA_ERROR_FUNCTION_NOT_LOADED is returned if the attribute requires a fully
  * loaded function but the function is not loaded. The loading state of a function
@@ -16632,7 +16634,7 @@ CUresult CUDAAPI cuLaunchKernel(CUfunction f,
  *   in. The CUDA context associated with this stream must match that associated
  *   with function f.
  * - ::CUlaunchConfig::attrs is an array of ::CUlaunchConfig::numAttrs
- *   continguous ::CUlaunchAttribute elements. The value of this pointer is not
+ *   contiguous ::CUlaunchAttribute elements. The value of this pointer is not
  *   considered if ::CUlaunchConfig::numAttrs is zero. However, in that case, it
  *   is recommended to set the pointer to NULL.
  * - ::CUlaunchConfig::numAttrs is the number of attributes populating the
@@ -16748,7 +16750,7 @@ CUresult CUDAAPI cuLaunchKernel(CUfunction f,
  * complete. Alternatively, blocks of B may begin before all blocks of A have
  * begun, for example:
  *
- *  - If B can claim execution resources unavaiable to A, for example if they
+ *  - If B can claim execution resources unavailable to A, for example if they
  *    run on different GPUs.
  *  - If B is a higher priority than A.
  *
@@ -20122,7 +20124,7 @@ CUresult CUDAAPI cuGraphExecExternalSemaphoresWaitNodeSetParams(CUgraphExec hGra
  * \brief Enables or disables the specified node in the given graphExec
  *
  * Sets \p hNode to be either enabled or disabled. Disabled nodes are functionally equivalent 
- * to empty nodes until they are reenabled. Existing node parameters are not affected by 
+ * to empty nodes until they are re-enabled. Existing node parameters are not affected by 
  * disabling/enabling the node.
  *  
  * The node is identified by the corresponding node \p hNode in the non-executable 
@@ -20327,7 +20329,7 @@ CUresult CUDAAPI cuGraphDestroy(CUgraph hGraph);
  *   - Changing the number of semaphores is not supported.
  * - Conditional nodes:
  *   - Changing node parameters is not supported.
- *   - Changeing parameters of nodes within the conditional body graph is subject to the rules above.
+ *   - Changing parameters of nodes within the conditional body graph is subject to the rules above.
  *   - Conditional handle flags and default values are updated as part of the graph update.
  *
  * Note:  The API may add further restrictions in future releases.  The return code should always be checked.
@@ -22392,7 +22394,7 @@ CUresult CUDAAPI cuSurfObjectGetResourceDesc(CUDA_RESOURCE_DESC *pResDesc, CUsur
 /** @} */ /* END CUDA_SURFOBJECT */
 
 /**
- * \defgroup CUDA_TENSOR_MEMORY Tensor Map Object Managment
+ * \defgroup CUDA_TENSOR_MEMORY Tensor Map Object Management
  *
  * ___MANBRIEF___ tensor map object management functions of the low-level CUDA
  * driver API (___CURRENT_FILE___) ___ENDMANBRIEF___
@@ -22526,7 +22528,7 @@ CUresult CUDAAPI cuSurfObjectGetResourceDesc(CUDA_RESOURCE_DESC *pResDesc, CUsur
  * \param globalAddress     - Starting address of memory region described by tensor
  * \param globalDim         - Array containing tensor size (number of elements) along each of the \p tensorRank dimensions
  * \param globalStrides     - Array containing stride size (in bytes) along each of the \p tensorRank - 1 dimensions
- * \param boxDim            - Array containing traversal box size (number of elments) along each of the \p tensorRank dimensions. Specifies how many elements to be traversed along each tensor dimension.
+ * \param boxDim            - Array containing traversal box size (number of elements) along each of the \p tensorRank dimensions. Specifies how many elements to be traversed along each tensor dimension.
  * \param elementStrides    - Array containing traversal stride in each of the \p tensorRank dimensions
  * \param interleave        - Type of interleaved layout the tensor addresses
  * \param swizzle           - Bank swizzling pattern inside shared memory
@@ -23198,7 +23200,7 @@ CUresult CUDAAPI cuGraphicsUnmapResources(unsigned int count, CUgraphicsResource
  *
  * It will also set the optional \p symbolStatus to one of the values in
  * ::CUdriverProcAddressQueryResult with the following meanings:
- * - ::CU_GET_PROC_ADDRESS_SUCCESS - The requested symbol was succesfully found based
+ * - ::CU_GET_PROC_ADDRESS_SUCCESS - The requested symbol was successfully found based
  *   on input arguments and \p pfn is valid
  * - ::CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND - The requested symbol was not found
  * - ::CU_GET_PROC_ADDRESS_VERSION_NOT_SUFFICIENT - The requested symbol was found but is
@@ -23578,7 +23580,7 @@ typedef struct CUdevSmResource_st {
  *     };
  * };
  * \endcode
- * - If \p type is \p CU_DEV_RESOURCE_TYPE_INVALID, this resoure is not valid and cannot be further accessed.
+ * - If \p type is \p CU_DEV_RESOURCE_TYPE_INVALID, this resource is not valid and cannot be further accessed.
  * - If \p type is \p CU_DEV_RESOURCE_TYPE_SM, the ::CUdevSmResource structure \p sm is filled in. For example,
  * \p sm.smCount will reflect the amount of streaming multiprocessors available in this resource.
  */
@@ -23797,7 +23799,7 @@ CUresult CUDAAPI cuGreenCtxGetDevResource(CUgreenCtx hCtx, CUdevResource* resour
  * \param nbGroups - This is a pointer, specifying the number of groups that would be or should be created as described below.
  * \param input - Input SM resource to be split. Must be a valid \p CU_DEV_RESOURCE_TYPE_SM resource.
  * \param remaining - If the input resource cannot be cleanly split among \p nbGroups, the remaining is placed in here.
- * Can be ommitted (NULL) if the user does not need the remaining set.
+ * Can be omitted (NULL) if the user does not need the remaining set.
  * \param useFlags - Flags specifying how these partitions are used or which constraints to abide by when splitting the input.
  * \param minCount - Minimum number of SMs required
  *

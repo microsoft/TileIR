@@ -12,7 +12,6 @@ def main():
     sys.exit(pytest.main([test_file] + sys.argv[1:]))
 
 
-
 def torch_assert_close(tensor_a,
                        tensor_b,
                        rtol=1e-2,

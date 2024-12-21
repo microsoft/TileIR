@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,7 +54,7 @@ class FragmentAccessDetector : public StmtExprVisitor {
  private:
   void VisitExpr_(const BufferLoadNode* op) final {
     // Check if the buffer is in global scope
-    if (IsFragementBuffer(op->buffer)) {
+    if (IsFragmentBuffer(op->buffer)) {
       has_fragment_access_ = true;
     }
     StmtExprVisitor::VisitExpr_(op);
@@ -60,14 +62,14 @@ class FragmentAccessDetector : public StmtExprVisitor {
 
   void VisitStmt_(const BufferStoreNode* op) final {
     // Check if the buffer is in global scope
-    if (IsFragementBuffer(op->buffer)) {
+    if (IsFragmentBuffer(op->buffer)) {
       has_fragment_access_ = true;
     }
     StmtExprVisitor::VisitStmt_(op);
   }
 
-  // Helper function to determine if a buffer is local.fragement
-  bool IsFragementBuffer(const Buffer& buffer) {
+  // Helper function to determine if a buffer is local.fragment
+  bool IsFragmentBuffer(const Buffer& buffer) {
     // The storage scope is often encoded in the buffer->data var name or associated attributes.
     String scope = buffer.scope();
     return scope == "local.fragment";

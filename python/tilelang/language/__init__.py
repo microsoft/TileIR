@@ -1,29 +1,16 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 """The language interface for tl programs."""
 
 from typing import Union, List, Optional, Tuple, Dict, Any
 from tvm import tir
+from tvm.tir import IntImm
 from tvm.script import tir as T
 from tvm.script.parser.tir import *
 from tvm.script.ir_builder.tir.frame import TIRFrame
 from tvm._ffi import register_object
 from tilelang import _ffi_api
-from tilelang.layout import Layout, Fragment
+from tilelang.layout import Layout, Fragment  # noqa: F401
 
 
 def Parallel(*extents: tir.PrimExpr, coalesced_width: Optional[int] = None):
@@ -46,15 +33,13 @@ def Parallel(*extents: tir.PrimExpr, coalesced_width: Optional[int] = None):
     return _ffi_api.Parallel(extents, annotations)  # type: ignore[attr-defined] # pylint: disable=no-member
 
 
-def Pipelined(
-        start: tir.PrimExpr, 
-        stop: tir.PrimExpr = None, 
-        num_stages: int = 0, 
-        order: Optional[List[int]] = None, 
-        stage: Optional[List[int]] = None, 
-        sync: Optional[List[List[int]]] = None,
-        group: Optional[List[List[int]]] = None
-    ):
+def Pipelined(start: tir.PrimExpr,
+              stop: tir.PrimExpr = None,
+              num_stages: int = 0,
+              order: Optional[List[int]] = None,
+              stage: Optional[List[int]] = None,
+              sync: Optional[List[List[int]]] = None,
+              group: Optional[List[List[int]]] = None):
     """Tools to construct pipelined for loop.
 
     Parameters
@@ -73,10 +58,7 @@ def Pipelined(
     """
     if stop is None:
         stop = start
-        if hasattr(start, "dtype"):
-            start = IntImm(start.dtype, 0)
-        else:
-            start = 0
+        start = IntImm(start.dtype, 0) if hasattr(start, "dtype") else 0
     if order is None:
         order = []
     if stage is None:
@@ -91,6 +73,7 @@ def Pipelined(
 
 @register_object("tl.KernelLaunchFrame")
 class KernelLaunchFrame(TIRFrame):
+
     def __enter__(self) -> Union[Var, List[Var]]:  # type: ignore[override]
         # Frames: BlockIdx.x, BlockIdx.y, BlockIdx.z, ThreadIdx.x, ThreadIdx.y, ThreadIdx.z, Root Block
         super().__enter__()
@@ -99,8 +82,9 @@ class KernelLaunchFrame(TIRFrame):
         return [frame.iter_var.var for frame in self.frames[0:-4]]
 
 
-def Kernel(*blocks: List[tir.PrimExpr], threads: Union[int, List[int], Tuple] = 128, 
-           prelude:Optional[str]=None):
+def Kernel(*blocks: List[tir.PrimExpr],
+           threads: Union[int, List[int], Tuple] = 128,
+           prelude: Optional[str] = None):
     """Tools to quickly construct a GPU kernel launch frame.
 
     Parameters
@@ -122,7 +106,7 @@ def Kernel(*blocks: List[tir.PrimExpr], threads: Union[int, List[int], Tuple] = 
     res : Tuple[frame.LaunchThreadFrame]
         The result LaunchThreadFrame.
     """
-    attrs:dict = {}
+    attrs: dict = {}
 
     if isinstance(threads, int):
         threads = [threads, 1, 1]
@@ -140,12 +124,9 @@ def Kernel(*blocks: List[tir.PrimExpr], threads: Union[int, List[int], Tuple] = 
 
 
 def use_swizzle(panel_size: int, order: str = "row", enable: bool = True):
-    device_func = (
-        "rasterization2DRow" if order == "row" else "rasterization2DColumn"
-    )
-    return T.attr(
-        None, "threadblock_swizzle_pattern", f"tl::{device_func}<{panel_size}>"
-    ) if enable else None
+    device_func = ("rasterization2DRow" if order == "row" else "rasterization2DColumn")
+    return T.attr(None, "threadblock_swizzle_pattern",
+                  f"tl::{device_func}<{panel_size}>") if enable else None
 
 
 def alloc_shared(shape, dtype, scope="shared.dyn"):
@@ -165,7 +146,7 @@ def annotate_layout(layout_map):
     return T.block_attr({"layout_map": layout_map})
 
 
-def import_source(source:Optional[str] = None):
+def import_source(source: Optional[str] = None):
     return T.block_attr({"pragma_import_c": source}) if source is not None else None
 
 
@@ -195,6 +176,7 @@ def copy(
     dst: Union[tir.Buffer, tir.BufferLoad],
     coalesced_width: Optional[int] = None,
 ):
+
     def get_extent(data):
         if isinstance(data, tir.Buffer):
             return data.shape
@@ -310,9 +292,8 @@ def clear(buffer: tir.Buffer):
 def reduce(buffer: tir.Buffer, out: tir.Buffer, reduce_type: str, dim: int, clear: bool):
     buffer = buffer.access_ptr("r")
     out = out.access_ptr("w")
-    return tir.call_intrin(
-        "handle", tir.op.Op.get("tl.reduce"), buffer, out, reduce_type, dim, clear
-    )
+    return tir.call_intrin("handle", tir.op.Op.get("tl.reduce"), buffer, out, reduce_type, dim,
+                           clear)
 
 
 def reduce_max(buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True):
@@ -350,10 +331,10 @@ def reduce_abssum(buffer: tir.Buffer, out: tir.Buffer, dim: int):
 def atomic_add(dst, value):
     return T.call_extern("handle", "atomicAdd", T.address_of(dst), value)
 
+
 def atomic_addx2(dst, value):
     return T.call_extern("handle", "atomicAddx2", T.address_of(dst), T.address_of(value))
 
+
 def dp4a(A, B, C):
-    return T.call_extern(
-        "handle", "DP4A", T.address_of(A), T.address_of(B), T.address_of(C)
-    )
+    return T.call_extern("handle", "DP4A", T.address_of(A), T.address_of(B), T.address_of(C))

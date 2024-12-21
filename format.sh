@@ -3,35 +3,22 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-# This script runs code formatters and linters on the codebase.
-#
-# Tools involved:
-# - YAPF for Python formatting.
-# - Ruff for Python linting.
-# - Codespell for spelling checks in Python files.
-# - Clang-format for C/C++ formatting.
-#
 # Usage:
-#    # Do your work and commit changes.
-#    # Then run:
-#    bash format.sh
-#
-#    # This will:
-#    #  - Format Python files that differ from origin/main using YAPF.
-#    #  - Check spelling in changed Python files using Codespell.
-#    #  - Lint changed Python files using Ruff.
-#    #  - Format changed C/C++ files with clang-format.
-#
-#    # To explicitly format all files or specific files, use:
-#    #    bash format.sh --all
-#    #    bash format.sh --files path/to/file.py
-#
-#    # After running, if any files were changed by the formatters, you will need
-#    # to review and commit those changes again before pushing.
+#    # Do work and commit your work.
 
+#    # Format files that differ from origin/main.
+#    bash format.sh
+
+#    # Commit changed files with message 'Run yapf and ruff'
+#
+#
+# YAPF + Clang formatter (if installed). This script formats all changed files from the last mergebase.
+# You are encouraged to run this locally before pushing changes for review.
+
+# Cause the script to exit if a single command fails
 set -eo pipefail
 
-# Move to script directory
+# this stops git rev-parse from failing if we run this from the .git directory
 builtin cd "$(dirname "${BASH_SOURCE:-$0}")"
 ROOT="$(git rev-parse --show-toplevel)"
 builtin cd "$ROOT" || exit 1
@@ -40,11 +27,10 @@ YAPF_VERSION=$(yapf --version | awk '{print $2}')
 RUFF_VERSION=$(ruff --version | awk '{print $2}')
 CODESPELL_VERSION=$(codespell --version)
 
-# Function to check tool versions against requirements-dev.txt
+# # params: tool name, tool version, required version
 tool_version_check() {
-    # params: tool name, installed version, required version
     if [[ $2 != $3 ]]; then
-        echo "Wrong $1 version installed: $2 is installed, but $3 is required."
+        echo "Wrong $1 version installed: $3 is required, not $2."
         exit 1
     fi
 }
@@ -62,15 +48,23 @@ YAPF_FLAGS=(
 
 YAPF_EXCLUDES=(
     '--exclude' 'build/**'
+    '--exclude' '3rdparty/**'
 )
 
-# Format specified Python files
+# Format specified files
 format() {
     yapf --in-place "${YAPF_FLAGS[@]}" "$@"
 }
 
-# Format changed Python files relative to main branch
+# Format files that differ from main branch. Ignores dirs that are not slated
+# for autoformat yet.
 format_changed() {
+    # The `if` guard ensures that the list of filenames is not empty, which
+    # could cause yapf to receive 0 positional arguments, making it hang
+    # waiting for STDIN.
+    #
+    # `diff-filter=ACM` and $MERGEBASE is to ensure we only format files that
+    # exist on both branches.
     if git show-ref --verify --quiet refs/remotes/origin/main; then
         BASE_BRANCH="origin/main"
     else
@@ -83,34 +77,46 @@ format_changed() {
         git diff --name-only --diff-filter=ACM "$MERGEBASE" -- '*.py' '*.pyi' | xargs -P 5 \
              yapf --in-place "${YAPF_EXCLUDES[@]}" "${YAPF_FLAGS[@]}"
     fi
+
 }
 
-# Format all Python files
+# Format all files
 format_all() {
     yapf --in-place "${YAPF_FLAGS[@]}" "${YAPF_EXCLUDES[@]}" .
 }
 
+## This flag formats individual files. --files *must* be the first command line
+## arg to use this option.
 if [[ "$1" == '--files' ]]; then
    format "${@:2}"
+   # If `--all` is passed, then any further arguments are ignored and the
+   # entire python directory is formatted.
 elif [[ "$1" == '--all' ]]; then
    format_all
 else
+   # Format only the files that changed in last commit.
    format_changed
 fi
 echo 'tile-lang yapf: Done'
 
 echo 'tile-lang codespell: Check Start'
-# Run codespell on specified files
+# check spelling of specified files
 spell_check() {
     codespell "$@"
 }
 
-spell_check_all() {
+spell_check_all(){
   codespell --toml pyproject.toml
 }
 
-# Check spelling in changed Python files
+# Spelling  check of files that differ from main branch.
 spell_check_changed() {
+    # The `if` guard ensures that the list of filenames is not empty, which
+    # could cause ruff to receive 0 positional arguments, making it hang
+    # waiting for STDIN.
+    #
+    # `diff-filter=ACM` and $MERGEBASE is to ensure we only lint files that
+    # exist on both branches.
     if git show-ref --verify --quiet refs/remotes/origin/main; then
         BASE_BRANCH="origin/main"
     else
@@ -125,23 +131,36 @@ spell_check_changed() {
     fi
 }
 
+# Run Codespell
+## This flag runs spell check of individual files. --files *must* be the first command line
+## arg to use this option.
 if [[ "$1" == '--files' ]]; then
    spell_check "${@:2}"
+   # If `--all` is passed, then any further arguments are ignored and the
+   # entire python directory is linted.
 elif [[ "$1" == '--all' ]]; then
    spell_check_all
 else
+   # Check spelling only of the files that changed in last commit.
    spell_check_changed
 fi
 echo 'tile-lang codespell: Done'
 
 echo 'tile-lang ruff: Check Start'
-# Lint specified Python files
+# Lint specified files
 lint() {
-    ruff "$@"
+    ruff check "$@"
 }
 
-# Lint changed Python files
+# Lint files that differ from main branch. Ignores dirs that are not slated
+# for autolint yet.
 lint_changed() {
+    # The `if` guard ensures that the list of filenames is not empty, which
+    # could cause ruff to receive 0 positional arguments, making it hang
+    # waiting for STDIN.
+    #
+    # `diff-filter=ACM` and $MERGEBASE is to ensure we only lint files that
+    # exist on both branches.
     if git show-ref --verify --quiet refs/remotes/origin/main; then
         BASE_BRANCH="origin/main"
     else
@@ -152,17 +171,25 @@ lint_changed() {
 
     if ! git diff --diff-filter=ACM --quiet --exit-code "$MERGEBASE" -- '*.py' '*.pyi' &>/dev/null; then
         git diff --name-only --diff-filter=ACM "$MERGEBASE" -- '*.py' '*.pyi' | xargs \
-             ruff
+             ruff check
     fi
+
 }
 
+# Run Ruff
+### This flag lints individual files. --files *must* be the first command line
+### arg to use this option.
 if [[ "$1" == '--files' ]]; then
    lint "${@:2}"
+   # If `--all` is passed, then any further arguments are ignored and the
+   # entire python directory is linted.
 elif [[ "$1" == '--all' ]]; then
-   lint TileLang tests
+   lint python testing
 else
+   # Format only the files that changed in last commit.
    lint_changed
 fi
+
 echo 'tile-lang ruff: Done'
 
 echo 'tile-lang clang-format: Check Start'
@@ -178,9 +205,12 @@ if command -v clang-format &>/dev/null; then
         clang-format "${CLANG_FORMAT_FLAGS[@]}" "$@"
     }
 
-    # Format all C/C++ files in the repo
+    # Format all C/C++ files in the repo, excluding specified directories
     clang_format_all() {
-        find . -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) -exec clang-format -i {} +
+        find . -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
+            -not -path "./3rdparty/*" \
+            -not -path "./build/*" \
+            -exec clang-format -i {} +
     }
 
     # Format changed C/C++ files relative to main
@@ -215,6 +245,71 @@ echo 'tile-lang clang-format: Done'
 
 # Check if there are any uncommitted changes after all formatting steps.
 # If there are, ask the user to review and stage them.
+if ! git diff --quiet &>/dev/null; then
+    echo 'Reformatted files. Please review and stage the changes.'
+    echo 'Changes not staged for commit:'
+    echo
+    git --no-pager diff --name-only
+
+    exit 1
+fi
+
+# Check if clang-tidy is installed and get the version
+if command -v clang-tidy &>/dev/null; then
+    CLANG_TIDY_VERSION=$(clang-tidy --version | head -n 1 | awk '{print $3}')
+    tool_version_check "clang-tidy" "$CLANG_TIDY_VERSION" "$(grep clang-tidy requirements-dev.txt | cut -d'=' -f3)"
+else
+    echo "clang-tidy not found. Skipping C++ static analysis."
+    CLANG_TIDY_AVAILABLE=false
+fi
+
+# Function to run clang-tidy
+clang_tidy() {
+    clang-tidy "$@" -- -std=c++17
+}
+
+# Run clang-tidy on all C/C++ files
+clang_tidy_all() {
+    find . -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
+        -not -path "./3rdparty/*" -not -path "./build/*" \
+        | xargs -n 1 clang-tidy -- -std=c++17
+}
+
+# Run clang-tidy on changed C/C++ files relative to main
+clang_tidy_changed() {
+    if git show-ref --verify --quiet refs/remotes/origin/main; then
+        BASE_BRANCH="origin/main"
+    else
+        BASE_BRANCH="main"
+    fi
+
+    MERGEBASE="$(git merge-base $BASE_BRANCH HEAD)"
+
+    if ! git diff --diff-filter=ACM --quiet --exit-code "$MERGEBASE" -- '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' &>/dev/null; then
+        git diff --name-only --diff-filter=ACM "$MERGEBASE" -- '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' | xargs -n 1 clang-tidy -- -std=c++17
+    fi
+}
+
+# Add clang-tidy support to the main script logic
+echo 'tile-lang clang-tidy: Check Start'
+
+if [[ "$CLANG_TIDY_AVAILABLE" != false ]]; then
+    if [[ "$1" == '--files' ]]; then
+       # If --files is given, analyze only the provided files
+       clang_tidy "${@:2}"
+    elif [[ "$1" == '--all' ]]; then
+       # If --all is given, analyze all eligible C/C++ files
+       clang_tidy_all
+    else
+       # Otherwise, analyze only changed C/C++ files
+       clang_tidy_changed
+    fi
+else
+    echo "clang-tidy is not available. Skipping static analysis."
+fi
+
+echo 'tile-lang clang-tidy: Done'
+
 if ! git diff --quiet &>/dev/null; then
     echo 'Reformatted files. Please review and stage the changes.'
     echo 'Changes not staged for commit:'

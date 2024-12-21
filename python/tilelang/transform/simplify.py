@@ -1,3 +1,5 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 from tilelang import tvm as tvm
 from tvm import IRModule
 from tvm.tir import PrimFunc
@@ -15,6 +17,7 @@ def Simplify():
     """
     return _ffi_api.Simplify()  # type: ignore
 
+
 def _Simplify(stmt: Union[PrimFunc, IRModule]) -> Union[PrimFunc, IRModule]:
     if isinstance(stmt, PrimFunc):
         mod = Simplify()(IRModule.from_expr(stmt))
@@ -24,7 +27,8 @@ def _Simplify(stmt: Union[PrimFunc, IRModule]) -> Union[PrimFunc, IRModule]:
         return Simplify()(stmt)
     else:
         raise ValueError(f"Unsupported type: {type(stmt)}")
-    
+
+
 # Decorator to simplify the output of a function
 def simplify_prim_func(func: Callable) -> Callable:
 

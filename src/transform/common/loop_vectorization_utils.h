@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -461,7 +463,7 @@ class Vectorizer : public StmtMutator, public ExprFunctor<PrimExpr(const PrimExp
     // A single var can be binded in multiple lets
     // but they have to bind to the same value.
     // This is used to allow cases when we reuse a single let
-    // expression to cosntruct a nested expr.
+    // expression to construct a nested expr.
     // (let x = 1 in x + 1) * (let x = 1 in x + 1)
     auto it = let_binding_.find(op->var);
     if (it != let_binding_.end()) {
@@ -632,7 +634,7 @@ class Vectorizer : public StmtMutator, public ExprFunctor<PrimExpr(const PrimExp
     return Allocate(op->buffer_var, op->dtype, extents, condition, body);
   }
 
-  // scalarize the statment
+  // scalarize the statement
   Stmt Scalarize(Stmt stmt) {
     Var idx(var_->name_hint + ".s", var_->dtype);
     stmt = Substitute(stmt, {{var_, idx}});
@@ -654,7 +656,7 @@ class Vectorizer : public StmtMutator, public ExprFunctor<PrimExpr(const PrimExp
   PrimExpr var_lanes_;
   // ramp representing the var.
   PrimExpr ramp_;
-  // flag to mark requirment of scalarization.
+  // flag to mark requirement of scalarization.
   bool need_scalarize_{false};
   // Let binding
   std::unordered_map<Var, PrimExpr, ObjectPtrHash, ObjectPtrEqual> let_binding_;

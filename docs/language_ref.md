@@ -28,7 +28,7 @@ The shape represents the whole shape of the buffer. Each element in the buffer i
 ## T.copy
 args: src, dst
 
-Copys data from src to dst, src and dst can be one of (Buffer, BufferLoad, BufferRegion). If you use BufferLoad that represents a single starting point, the other params should not be BufferLoad, since we need to know the copy region.
+Copies data from src to dst, src and dst can be one of (Buffer, BufferLoad, BufferRegion). If you use BufferLoad that represents a single starting point, the other params should not be BufferLoad, since we need to know the copy region.
 
 Zero will be padded if we detect the load is out of boundary.
 
@@ -45,7 +45,7 @@ args: src, dst, dim
 Performs a reduce operation from src to dst on dimension dim. Currently we only support src and dst to be a fragment.
 
 ## T.Parallel
-You can use T.Parallel to write a loop. The loop will be partitioned to all the threads by the compiler (The compiler will consider vectorize size, the fragment's thread mapping ... ). Note that this is the only way you can perform arbitary operation on fragments.
+You can use T.Parallel to write a loop. The loop will be partitioned to all the threads by the compiler (The compiler will consider vectorize size, the fragment's thread mapping ... ). Note that this is the only way you can perform arbitrary operation on fragments.
 
 ## T.Pipelined
 args: start, stop, num_stages

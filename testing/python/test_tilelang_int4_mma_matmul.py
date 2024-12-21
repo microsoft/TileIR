@@ -5,7 +5,6 @@ import torch
 import torch.backends
 from tilelang import tvm as tvm
 import tilelang.testing
-from tvm import DataType
 import tilelang as TL
 import tilelang.language as T
 from tilelang.intrinsics import (
@@ -281,6 +280,7 @@ def tl_matmul_weight_only_transform(
         chunk=chunk,
         transform_kind_b=transform_b,
     )
+
     @T.prim_func
     def main(
             A: T.Buffer(A_shape, in_dtype),
