@@ -469,7 +469,7 @@ tvm::transform::Pass Simplify() {
     return CreatePrimFuncPass(pass_func, 0, "tl.Simplify", {});
 }
 
-TVM_REGISTER_GLOBAL("tl.transform.transform.Simplify").set_body_typed(Simplify);
+TVM_REGISTER_GLOBAL("tl.transform.Simplify").set_body_typed(Simplify);
 
 } // namespace tl
 } // namespace tvm
