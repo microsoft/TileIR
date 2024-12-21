@@ -190,15 +190,6 @@ else
    lint_changed
 fi
 
-if ! git diff --quiet &>/dev/null; then
-    echo 'Reformatted files. Please review and stage the changes.'
-    echo 'Changes not staged for commit:'
-    echo
-    git --no-pager diff --name-only
-
-    exit 1
-fi
-
 echo 'tile-lang ruff: Done'
 
 echo 'tile-lang clang-format: Check Start'
@@ -214,9 +205,12 @@ if command -v clang-format &>/dev/null; then
         clang-format "${CLANG_FORMAT_FLAGS[@]}" "$@"
     }
 
-    # Format all C/C++ files in the repo
+    # Format all C/C++ files in the repo, excluding specified directories
     clang_format_all() {
-        find . -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) -exec clang-format -i {} +
+        find . -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
+            -not -path "./3rdparty/*" \
+            -not -path "./build/*" \
+            -exec clang-format -i {} +
     }
 
     # Format changed C/C++ files relative to main
@@ -251,6 +245,71 @@ echo 'tile-lang clang-format: Done'
 
 # Check if there are any uncommitted changes after all formatting steps.
 # If there are, ask the user to review and stage them.
+if ! git diff --quiet &>/dev/null; then
+    echo 'Reformatted files. Please review and stage the changes.'
+    echo 'Changes not staged for commit:'
+    echo
+    git --no-pager diff --name-only
+
+    exit 1
+fi
+
+# Check if clang-tidy is installed and get the version
+if command -v clang-tidy &>/dev/null; then
+    CLANG_TIDY_VERSION=$(clang-tidy --version | head -n 1 | awk '{print $3}')
+    tool_version_check "clang-tidy" "$CLANG_TIDY_VERSION" "$(grep clang-tidy requirements-dev.txt | cut -d'=' -f3)"
+else
+    echo "clang-tidy not found. Skipping C++ static analysis."
+    CLANG_TIDY_AVAILABLE=false
+fi
+
+# Function to run clang-tidy
+clang_tidy() {
+    clang-tidy "$@" -- -std=c++17
+}
+
+# Run clang-tidy on all C/C++ files
+clang_tidy_all() {
+    find . -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
+        -not -path "./3rdparty/*" -not -path "./build/*" \
+        | xargs -n 1 clang-tidy -- -std=c++17
+}
+
+# Run clang-tidy on changed C/C++ files relative to main
+clang_tidy_changed() {
+    if git show-ref --verify --quiet refs/remotes/origin/main; then
+        BASE_BRANCH="origin/main"
+    else
+        BASE_BRANCH="main"
+    fi
+
+    MERGEBASE="$(git merge-base $BASE_BRANCH HEAD)"
+
+    if ! git diff --diff-filter=ACM --quiet --exit-code "$MERGEBASE" -- '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' &>/dev/null; then
+        git diff --name-only --diff-filter=ACM "$MERGEBASE" -- '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' | xargs -n 1 clang-tidy -- -std=c++17
+    fi
+}
+
+# Add clang-tidy support to the main script logic
+echo 'tile-lang clang-tidy: Check Start'
+
+if [[ "$CLANG_TIDY_AVAILABLE" != false ]]; then
+    if [[ "$1" == '--files' ]]; then
+       # If --files is given, analyze only the provided files
+       clang_tidy "${@:2}"
+    elif [[ "$1" == '--all' ]]; then
+       # If --all is given, analyze all eligible C/C++ files
+       clang_tidy_all
+    else
+       # Otherwise, analyze only changed C/C++ files
+       clang_tidy_changed
+    fi
+else
+    echo "clang-tidy is not available. Skipping static analysis."
+fi
+
+echo 'tile-lang clang-tidy: Done'
+
 if ! git diff --quiet &>/dev/null; then
     echo 'Reformatted files. Please review and stage the changes.'
     echo 'Changes not staged for commit:'
