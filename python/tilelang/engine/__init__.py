@@ -6,12 +6,11 @@ import tilelang as tl
 import os
 import os.path as osp
 from typing import Literal, Union
-import tvm
+from tilelang import tvm as tvm
 from tvm import tir, relay
 from tvm.target import Target
 from tvm.contrib import rocm
 from tilelang.engine import hipcc, nvcc
-from typing import Literal
 
 
 def is_device_call(func: tir.PrimFunc):
@@ -36,7 +35,7 @@ def tvm_callback_cuda_compile(code, target):
 
     # special handle for Hopper
     if compute_version == "90":
-        arch = [f"-arch=sm_90a"]
+        arch = ["-arch=sm_90a"]
         format = "cubin"
     else:
         arch = [f"-arch=sm_{compute_version}"]
@@ -158,13 +157,13 @@ def lower(func_or_mod: Union[tir.PrimFunc, tvm.IRModule],
         try:
             nvcc.find_cuda_path()
             is_cuda_available = True
-        except:
+        except Exception:
             is_cuda_available = False
 
         try:
             rocm.find_rocm_path()
             is_hip_available = True
-        except:
+        except Exception:
             is_hip_available = False
 
         if is_cuda_available:

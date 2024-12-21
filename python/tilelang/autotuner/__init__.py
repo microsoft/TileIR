@@ -3,10 +3,10 @@
 """The auto-tune module for tl programs."""
 
 import tilelang as tl
+from tilelang import tvm as tvm
 import inspect
 from functools import wraps
-from typing import Any, Callable, List, Any, Literal
-import inspect
+from typing import Any, Callable, List, Literal
 from tqdm import tqdm
 import logging
 from dataclasses import dataclass

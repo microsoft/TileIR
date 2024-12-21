@@ -65,9 +65,7 @@ def compile_cuda(code,
     temp_target = temp.relpath(f"{file_name}.{target_format}")
 
     pass_context = tvm.get_global_func("transform.GetCurrentPassContext")()
-    kernels_output_dir = (
-        pass_context.config["cuda.kernels_output_dir"]
-        if "cuda.kernels_output_dir" in pass_context.config else None)
+    kernels_output_dir = (pass_context.config.get("cuda.kernels_output_dir", None))
     if kernels_output_dir is not None:
         if not os.path.isdir(kernels_output_dir):
             os.makedirs(kernels_output_dir)
@@ -258,7 +256,7 @@ def callback_libdevice_path(arch):
     try:
         return find_libdevice_path(arch)
     except RuntimeError:
-        warnings.warn("Cannot find libdevice path")
+        warnings.warn("Cannot find libdevice path", stacklevel=2)
         return ""
 
 
@@ -322,7 +320,7 @@ def parse_compute_version(compute_version):
         return major, minor
     except (IndexError, ValueError) as err:
         # pylint: disable=raise-missing-from
-        raise RuntimeError("Compute version parsing error: " + str(err))
+        raise RuntimeError("Compute version parsing error") from err
 
 
 def have_fp16(compute_version):
@@ -336,12 +334,10 @@ def have_fp16(compute_version):
     major, minor = parse_compute_version(compute_version)
     # fp 16 support in reference to:
     # https://docs.nvidia.com/cuda/cuda-c-programming-guide/#arithmetic-instructions
-    if major == 5 and minor == 3:
-        return True
-    if major >= 6:
-        return True
-
-    return False
+    conditions = [False]
+    conditions.append(major == 5 and minor >= 3)
+    conditions.append(major >= 6)
+    return any(conditions)
 
 
 def have_int8(compute_version):
@@ -353,10 +349,7 @@ def have_int8(compute_version):
         compute capability of a GPU (e.g. "6.1")
     """
     major, _ = parse_compute_version(compute_version)
-    if major >= 6:
-        return True
-
-    return False
+    return major >= 6
 
 
 def have_tensorcore(compute_version=None, target=None):
@@ -376,17 +369,17 @@ def have_tensorcore(compute_version=None, target=None):
             compute_version = tvm.cuda(0).compute_version
         else:
             if target is None or "arch" not in target.attrs:
-                warnings.warn("Tensorcore will be disabled due to no CUDA architecture specified."
-                              "Try specifying it by adding '-arch=sm_xx' to your target.")
+                warnings.warn(
+                    "Tensorcore will be disabled due to no CUDA architecture specified."
+                    "Try specifying it by adding '-arch=sm_xx' to your target.",
+                    stacklevel=2)
                 return False
             compute_version = target.attrs["arch"]
             # Compute version will be in the form "sm_{major}{minor}"
             major, minor = compute_version.split("_")[1]
             compute_version = major + "." + minor
     major, _ = parse_compute_version(compute_version)
-    if major >= 7:
-        return True
-    return False
+    return major >= 7
 
 
 def have_cudagraph():
