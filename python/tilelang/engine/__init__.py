@@ -1,19 +1,5 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 """The compiler for TL programs."""
 
 import tilelang as tl
@@ -26,6 +12,7 @@ from tvm.target import Target
 from tvm.contrib import rocm
 from tilelang.engine import hipcc, nvcc
 from typing import Literal
+
 
 def is_device_call(func: tir.PrimFunc):
     return bool(func.attrs and "calling_conv" in func.attrs and func.attrs["calling_conv"] == 2)
@@ -73,6 +60,7 @@ def tvm_callback_cuda_compile(code, target):
 
     return ptx
 
+
 @tvm.register_func("tvm_callback_hip_compile", override=True)
 def tvm_callback_hip_compile(code, target):
     project_root = osp.join(osp.dirname(__file__), "../../..")
@@ -98,10 +86,12 @@ def tvm_callback_hip_compile(code, target):
 
     return hsaco
 
+
 def extrac_params(func: tir.PrimFunc):
     buffers = [func.buffer_map[var] for var in func.params]
     tensor_types = [relay.TensorType(buffer.shape, buffer.dtype) for buffer in buffers]
     return tensor_types
+
 
 def detect_target(target: str = "auto") -> str:
     """Detect the computing target (CUDA or ROCm) based on the environment.
@@ -142,16 +132,15 @@ def detect_target(target: str = "auto") -> str:
 
     if target not in {"cuda", "hip"}:
         raise ValueError(f"Invalid target: {target}. Must be 'cuda', 'hip', or 'auto'.")
-    
+
     return target
 
+
 # TODO(lei): Should enhance to support IRModule with multiple functions
-def lower(
-    func_or_mod: Union[tir.PrimFunc, tvm.IRModule],
-    target: Union[Literal["auto", "cuda", "hip"], Target]="auto", 
-    target_host="llvm", 
-    runtime_only=False
-):
+def lower(func_or_mod: Union[tir.PrimFunc, tvm.IRModule],
+          target: Union[Literal["auto", "cuda", "hip"], Target] = "auto",
+          target_host="llvm",
+          runtime_only=False):
     # TODO(lei): Append C Source code host generation to the runtime
     mod = func_or_mod
     if isinstance(func_or_mod, tir.PrimFunc):
@@ -185,7 +174,8 @@ def lower(
         else:
             raise ValueError("No CUDA or HIP available")
     else:
-        assert isinstance(target, Target) or target in ["cuda", "hip"], f"Target {target} is not supported"
+        assert isinstance(target, Target) or target in ["cuda", "hip"
+                                                       ], f"Target {target} is not supported"
 
     target = tvm.target.Target(target, target_host)
 
@@ -229,7 +219,7 @@ def lower(
     mod = tir.transform.AnnotateEntryFunc()(mod)
     # TODO(lei): This is a hack to make sure the
     # thread level allreduce pass can be applied
-    # in TL. As Tl ony use one thread dimension
+    # in TL. As Tl only use one thread dimension
     # the var binding information will be lost
     # in the lowering process with Legalization
     # and Simplify pass.

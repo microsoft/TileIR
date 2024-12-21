@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
 /*
  * Copyright 1993-2023 NVIDIA Corporation.  All rights reserved.
  *

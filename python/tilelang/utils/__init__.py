@@ -1,33 +1,18 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 """The profiler and convert to torch utils"""
 
 from typing import Any, List, Literal
 from enum import Enum
 from functools import partial
 import torch
+from contextlib import suppress
 
 import tvm
 from torch.utils.dlpack import to_dlpack
 from tvm.runtime import ndarray
 from tvm.relay import TensorType
 from tvm.contrib.dlpack import to_pytorch_func
-from torch.utils.dlpack import to_dlpack
-from tvm.runtime import ndarray
 
 from tilelang.engine import lower
 
@@ -42,6 +27,7 @@ class TensorSupplyType(Enum):
 
 
 def get_tensor_supply(supply_type: TensorSupplyType):
+
     def get_tensor(tensor: TensorType) -> torch.Tensor:
         dtype = torch.__getattribute__(str(tensor.dtype))
         device = torch.cuda.current_device()
@@ -49,8 +35,8 @@ def get_tensor_supply(supply_type: TensorSupplyType):
         # torch.cuda.manual_seed(0)
         shape = list(map(int, tensor.shape))
         if dtype == torch.int8 and supply_type in [
-            TensorSupplyType.Uniform,
-            TensorSupplyType.Normal,
+                TensorSupplyType.Uniform,
+                TensorSupplyType.Normal,
         ]:
             return torch.ones(*shape, device=device, dtype=dtype)
 
@@ -136,7 +122,9 @@ def torch_assert_close(tensor_a,
     else:
         return True
 
+
 class ConvertTorch:
+
     def __init__(self, mod, params: List[TensorType], result_idx: List[int]) -> None:
         self.mod = mod
         self.params = params
@@ -179,6 +167,7 @@ class ConvertTorch:
 
 
 class Profiler(ConvertTorch):
+
     def __init__(
         self,
         mod,
@@ -196,7 +185,11 @@ class Profiler(ConvertTorch):
                 ins.append(self.supply(self.params[i]))
         return ins
 
-    def assert_allclose(self, reference_program: callable, atol: float = 1e-2, rtol: float = 1e-2, max_mismatched_ratio=0.01):
+    def assert_allclose(self,
+                        reference_program: callable,
+                        atol: float = 1e-2,
+                        rtol: float = 1e-2,
+                        max_mismatched_ratio=0.01):
         ins = self._get_inputs()
         ref_outs = reference_program(*ins)
         torch.cuda.synchronize()
@@ -216,7 +209,8 @@ class Profiler(ConvertTorch):
             # percentage_not_close = (num_not_close / total_elements) * 100
             # print(f"{percentage_not_close:.2f}% of the elements are not close.")
             # print(f"Total elements: {total_elements}, Not close elements: {num_not_close}")
-            torch_assert_close(lhs, rhs, rtol=rtol, atol=atol, max_mismatched_ratio=max_mismatched_ratio)
+            torch_assert_close(
+                lhs, rhs, rtol=rtol, atol=atol, max_mismatched_ratio=max_mismatched_ratio)
 
     def assert_consistent(self, repeat=10):
         # Used to check no race condition inside the kernel
@@ -230,8 +224,8 @@ class Profiler(ConvertTorch):
 
     def run_once(self, func=None):
         import ctypes
-        libcuda = ctypes.CDLL("libcuda.so")
-        
+        libcuda = ctypes.CDLL("libcuda.so")  # noqa: F841
+
         ins = self._get_inputs()
         if not func:
             func = self.__call__
@@ -251,22 +245,19 @@ class Profiler(ConvertTorch):
             ins = self._get_inputs() if input_tensors is None else input_tensors
             bench_func = partial(func, *ins)
             return do_bench(
-                bench_func, warmup=warmup, rep=rep, _n_warmup=n_warmup, _n_repeat=n_repeat
-            )
+                bench_func, warmup=warmup, rep=rep, _n_warmup=n_warmup, _n_repeat=n_repeat)
         elif profiler == "tvm":
             ins = self._get_inputs(with_output=True) if input_tensors is None else input_tensors
             target = "cuda"
-            try:
+
+            with suppress(Exception):
                 target = self.mod.imported_modules[0].type_key
-            except:
-                pass
-            
+
             assert target in ["cuda", "hip"], f"Unknown target: {target}"
 
             device = tvm.cuda(0) if target == "cuda" else tvm.rocm(0)
             time_evaluator = self.mod.time_evaluator(
-                self.mod.entry_name, device, number=rep, repeat=n_repeat
-            )
+                self.mod.entry_name, device, number=rep, repeat=n_repeat)
             tvm_inputs = [ndarray.from_dlpack(to_dlpack(inp)) for inp in ins]
             # Transform Latency to ms
             return time_evaluator(*tvm_inputs).mean * 1e3
@@ -274,13 +265,11 @@ class Profiler(ConvertTorch):
             ins = self._get_inputs()
             bench_func = partial(func, *ins)
             torch_res = do_bench(
-                bench_func, warmup=warmup, rep=rep, _n_warmup=n_warmup, _n_repeat=n_repeat
-            )
+                bench_func, warmup=warmup, rep=rep, _n_warmup=n_warmup, _n_repeat=n_repeat)
 
             ins = self._get_inputs(with_output=True)
             time_evaluator = self.mod.time_evaluator(
-                self.mod.entry_name, tvm.cuda(0), number=rep, repeat=n_repeat
-            )
+                self.mod.entry_name, tvm.cuda(0), number=rep, repeat=n_repeat)
             tvm_inputs = [ndarray.from_dlpack(to_dlpack(inp)) for inp in ins]
             tvm_res = time_evaluator(*tvm_inputs).mean * 1e3
             return min(torch_res, tvm_res)
@@ -367,9 +356,8 @@ def do_bench(
         end_event[i].record()
     # Record clocks
     torch.cuda.synchronize()
-    times = torch.tensor(
-        [s.elapsed_time(e) for s, e in zip(start_event, end_event)], dtype=torch.float
-    )
+    times = torch.tensor([s.elapsed_time(e) for s, e in zip(start_event, end_event)],
+                         dtype=torch.float)
     if quantiles is not None:
         ret = torch.quantile(times, torch.tensor(quantiles, dtype=torch.float)).tolist()
         if len(ret) == 1:
