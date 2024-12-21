@@ -172,7 +172,7 @@ class SafeMemorysRewriter : public StmtExprMutator {
   }
 
   // Handle Call Nodes
-  // For exmaple
+  // For example
   // T.call_extern("handle", "atomicAddx2", T.address_of(C), T.address_of(C_shared))
   Stmt VisitStmt_(const EvaluateNode* op) final {
     auto evaluate = Downcast<Evaluate>(StmtExprMutator::VisitStmt_(op));
@@ -244,7 +244,7 @@ class SafeMemoryLegalizer : IRMutatorWithAnalyzer {
       // Array<PrimExpr> conditions = checker.GetConditions();
       // auto body = for_node->body;
       // // Note that we might have duplicate conditions
-      // // Which will be optimzied by simplify pass
+      // // Which will be optimized by simplify pass
       // // Replace the loop body with the new body
       // for (auto cond : conditions) {
       //   body = IfThenElse(cond, body);

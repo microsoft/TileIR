@@ -48,6 +48,7 @@ YAPF_FLAGS=(
 
 YAPF_EXCLUDES=(
     '--exclude' 'build/**'
+    '--exclude' '3rdparty/**'
 )
 
 # Format specified files
@@ -183,7 +184,7 @@ if [[ "$1" == '--files' ]]; then
    # If `--all` is passed, then any further arguments are ignored and the
    # entire python directory is linted.
 elif [[ "$1" == '--all' ]]; then
-   lint TileLang tests
+   lint python testing
 else
    # Format only the files that changed in last commit.
    lint_changed

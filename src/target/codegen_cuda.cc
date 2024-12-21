@@ -350,7 +350,7 @@ void CodeGenTileLangCUDA::PrintType(DataType t, std::ostream& os) {  // NOLINT(*
 
 void CodeGenTileLangCUDA::PrintVecBinaryOp(const std::string& op, DataType t, PrimExpr lhs, PrimExpr rhs,
                                  std::ostream& os) {  // NOLINT(*)
-  // Delcare the result.
+  // Declare the result.
   std::string sret = name_supply_->FreshName("_");
   this->PrintIndent();
   this->PrintType(t, stream);
@@ -1359,13 +1359,13 @@ void CodeGenTileLangCUDA::PrintWmmaScope(const std::string& scope, DataType t,
       } else if (t.bits() == 1) {
         type << "nvcuda::wmma::experimental::precision::b1";
       } else {
-        LOG(FATAL) << "Unhandled interger type for wmma fragment!";
+        LOG(FATAL) << "Unhandled integer type for wmma fragment!";
       }
     } else if (t.is_uint()) {
       if (t.bits() == 4) {
         type << "nvcuda::wmma::experimental::precision::u4";
       } else {
-        LOG(FATAL) << "Unhandled interger type for wmma fragment!";
+        LOG(FATAL) << "Unhandled integer type for wmma fragment!";
       }
     }
   }

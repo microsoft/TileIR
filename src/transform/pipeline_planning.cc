@@ -169,7 +169,7 @@ class PipelinePlanner : public StmtExprMutator {
     "The number of stages should be equal to the number of pipeline stages. " <<
     "Got " << order_idx << " stages and " << pipeline_stage_infos.size() << " pipeline stages.";
 
-    // if all the copy is at the end of the order, we can move these copy to the begining of the
+    // if all the copy is at the end of the order, we can move these copy to the beginning of the
     // order and shrink the stage offset by 1.
     int copy_stage_at_end = [&]() {
       int copy_stage_cnt = 0;
@@ -187,7 +187,7 @@ class PipelinePlanner : public StmtExprMutator {
       return -1;
     }();
     if (copy_stage_at_end > 0 && num_stages >= 2) {
-      for (auto& pinfo : pipeline_stage_infos) {  // move copy to the begining
+      for (auto& pinfo : pipeline_stage_infos) {  // move copy to the beginning
         pinfo.order = (pinfo.order + copy_stage_at_end) % pipeline_stage_infos.size();
         if (!pinfo.copy_stage) pinfo.stage--;
       }

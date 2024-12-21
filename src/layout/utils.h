@@ -28,7 +28,7 @@ Array<arith::IterSplitExpr> DivideUnusedIterators(const Array<PrimExpr>& exprs,
                                                   arith::Analyzer* analyzer);
 
 /*!
- * \brief Conpress the iterator var, remove the unused part of the var not present in the expr
+ * \brief Compress the iterator var, remove the unused part of the var not present in the expr
  *
  *  Returns the compressed IterVar as well as the Updated iter sum expression.
  */

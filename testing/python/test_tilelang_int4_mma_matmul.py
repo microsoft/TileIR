@@ -281,6 +281,7 @@ def tl_matmul_weight_only_transform(
         chunk=chunk,
         transform_kind_b=transform_b,
     )
+
     @T.prim_func
     def main(
             A: T.Buffer(A_shape, in_dtype),

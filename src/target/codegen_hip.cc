@@ -381,7 +381,7 @@ void CodeGenTileLangHIP::PrintType(DataType t, std::ostream& os) {  // NOLINT(*)
 
 void CodeGenTileLangHIP::PrintVecBinaryOp(const std::string& op, DataType t, PrimExpr lhs, PrimExpr rhs,
                                  std::ostream& os) {  // NOLINT(*)
-  // Delcare the result.
+  // Declare the result.
   std::string sret = name_supply_->FreshName("_");
   this->PrintIndent();
   this->PrintType(t, stream);

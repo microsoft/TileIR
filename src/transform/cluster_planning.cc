@@ -46,7 +46,7 @@ class ClusterPlanner {
     blockIdx_visitor(f->body);
     auto dom_map = blockIdx_visitor.dom_map_;
 
-    // Step 2: Collect mem resue count for clustering on each dimention.
+    // Step 2: Collect mem reuse count for clustering on each dimension.
     std::unordered_map<const IterVarNode*, size_t> mem_reuse_count;
     for (auto iv : dom_map) mem_reuse_count[iv] = 0;
 

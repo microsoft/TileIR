@@ -175,7 +175,7 @@ torch.testing.assert_close(c, ref_c, rtol=1e-2, atol=1e-2)
 print(rt_mod.imported_modules[0].get_source())
 ```
 
-TL also provide interface for users to manupulate the memory layout, pipeline and enable rasterization for better L2 Cache Locality. Here is an example of how to use the memory layout and rasterization:
+TL also provide interface for users to manipulate the memory layout, pipeline and enable rasterization for better L2 Cache Locality. Here is an example of how to use the memory layout and rasterization:
 
 ```python
 import tilelang.language as T
@@ -334,10 +334,6 @@ def dequant_matmul(
             T.gemm(B_dequantize_local, A_shared, Ct_local, transpose_B=True)
         T.copy(Ct_local, Ct[bx * block_N, by * block_M])
 ```
-
-## Roadmap
-- [ ] **Seperate TVM Library and Tile Language**.
-- [ ] **Transform BitBLAS 3rdparty tvm into tl_core branch and tilelang**.
 
 ---
 

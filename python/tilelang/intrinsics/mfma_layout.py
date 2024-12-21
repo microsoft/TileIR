@@ -5,6 +5,7 @@ from tvm import DataType
 from tvm.runtime import convert
 import tilelang.language as T
 
+
 def shared_16x4_to_local_64x1_layout_A(i, j):
     thread_id = (j * 16 + i)
     return thread_id, convert(0)

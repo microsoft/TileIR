@@ -4,7 +4,13 @@ column_limit = 100
 indent_width = 4
 
 [tool.codespell]
-ignore-words-list = "nd, te"
+ignore-words-list = "nd, te, ist, LOD, offen"
+skip = [
+    "build",
+    "3rdparty",
+    "dist",
+    ".venv"
+]
 
 [tool.ruff.lint]
 select = [
@@ -26,7 +32,7 @@ ignore = [
     "E402",
     # star imports
     "F405", "F403",
-    # ambigous name
+    # ambiguous name
     "E741",
     # line too long
     "E501",

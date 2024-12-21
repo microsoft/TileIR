@@ -695,7 +695,7 @@ class WSCodeEmitter : public StmtMutator {
 
     // consumer_release producer_acquire
     // valid when is_loop is true
-    // inject before the earlest producer stmt for each consumer
+    // inject before the earliest producer stmt for each consumer
     bool in_loop = !is_zero(parity_);
     if (in_loop) {
       for (int i = 0; i < n; i++) {
