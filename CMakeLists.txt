@@ -82,6 +82,7 @@ tilelang_file_glob(GLOB TILE_LANG_SRCS
     src/transform/*.cc
     src/op/*.cc
     src/target/utils.cc
+    src/runtime/*.cc
 )
 
 if(USE_CUDA)

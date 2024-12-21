@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 """The auto-tune module for tl programs."""
 
+import tvm
 import tilelang as tl
 from tilelang import tvm as tvm
 import inspect

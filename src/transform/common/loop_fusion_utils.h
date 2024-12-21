@@ -54,7 +54,7 @@ class FragmentAccessDetector : public StmtExprVisitor {
  private:
   void VisitExpr_(const BufferLoadNode* op) final {
     // Check if the buffer is in global scope
-    if (IsFragementBuffer(op->buffer)) {
+    if (IsFragmentBuffer(op->buffer)) {
       has_fragment_access_ = true;
     }
     StmtExprVisitor::VisitExpr_(op);

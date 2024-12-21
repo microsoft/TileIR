@@ -41,7 +41,7 @@ def get_tensor_supply(supply_type: TensorSupplyType):
             return torch.ones(*shape, device=device, dtype=dtype)
 
         if supply_type == TensorSupplyType.Integer:
-            return torch.randint(low=-2, high=3, size=shape, device=device, dtype=dtype)
+            return torch.randint(low=0, high=7, size=shape, device=device, dtype=dtype)
         elif supply_type == TensorSupplyType.Uniform:
             return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
         elif supply_type == TensorSupplyType.Normal:
@@ -238,7 +238,7 @@ class Profiler(ConvertTorch):
         rep=100,
         n_warmup=1,
         n_repeat=1,
-        profiler: Literal["torch", "tvm", "auto"] = "auto",
+        profiler: Literal["torch", "tvm", "auto"] = "torch",
         input_tensors: List[torch.Tensor] = None,
     ):
         if profiler == "torch":
