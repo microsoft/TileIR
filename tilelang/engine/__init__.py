@@ -23,7 +23,7 @@ def is_host_call(func: tir.PrimFunc):
 
 @tvm.register_func("tvm_callback_cuda_compile", override=True)
 def tvm_callback_cuda_compile(code, target):
-    project_root = osp.join(osp.dirname(__file__), "../../..")
+    project_root = osp.join(osp.dirname(__file__), "../..")
     tl_template_path = osp.abspath(osp.join(project_root, "src"))
     # TODO(lei): this indeed should be renamed into
     # TL_CUTLASS_INCLUDE_PATH
@@ -62,7 +62,7 @@ def tvm_callback_cuda_compile(code, target):
 
 @tvm.register_func("tvm_callback_hip_compile", override=True)
 def tvm_callback_hip_compile(code, target):
-    project_root = osp.join(osp.dirname(__file__), "../../..")
+    project_root = osp.join(osp.dirname(__file__), "../..")
     tl_template_path = osp.abspath(osp.join(project_root, "src"))
 
     # TODO(lei): actually this indeed should be renamed into

@@ -102,9 +102,9 @@ else:
         sys.path.insert(0, install_tvm_path + "/python")
 
     develop_tvm_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "3rdparty", "tvm")
+        os.path.dirname(os.path.abspath(__file__)), "..", "3rdparty", "tvm")
     tvm_library_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "build", "tvm")
+        os.path.dirname(os.path.abspath(__file__)), "..", "build", "tvm")
     if os.path.exists(develop_tvm_path) and develop_tvm_path not in sys.path:
         os.environ["PYTHONPATH"] = develop_tvm_path + "/python:" + os.environ.get("PYTHONPATH", "")
         sys.path.insert(0, develop_tvm_path + "/python")
@@ -115,7 +115,7 @@ if os.environ.get("TL_CUTLASS_PATH", None) is None:
     install_cutlass_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "3rdparty", "cutlass")
     develop_cutlass_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "3rdparty", "cutlass")
+        os.path.dirname(os.path.abspath(__file__)), "..", "3rdparty", "cutlass")
     if os.path.exists(install_cutlass_path):
         os.environ["TL_CUTLASS_PATH"] = install_cutlass_path + "/include"
     elif (os.path.exists(develop_cutlass_path) and develop_cutlass_path not in sys.path):
