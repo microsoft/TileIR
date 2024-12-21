@@ -16,19 +16,21 @@
 # under the License.
 """The auto-tune module for tl programs."""
 
+import tvm
 import tilelang as tl
 import inspect
 from functools import wraps
-from typing import Any, Callable, List, Any, Literal
-import inspect
+from typing import Callable, List, Any, Literal
 from tqdm import tqdm
 import logging
 from dataclasses import dataclass
 import concurrent.futures
 
-logging.basicConfig(filename='out.log', filemode='w', level=logging.INFO, 
-                    format='%(asctime)s %(levelname)s:%(message)s')
-
+logging.basicConfig(
+    filename='out.log',
+    filemode='w',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s:%(message)s')
 
 
 @dataclass(frozen=True)
@@ -43,7 +45,9 @@ class JITContext:
     profiler: Literal['torch', 'tvm']
     target: Literal['cuda', 'hip']
 
+
 class Autotuner:
+
     def __init__(
         self,
         fn: Callable,
@@ -59,12 +63,12 @@ class Autotuner:
         self.warmup = warmup
         self.rep = rep
         self.timeout = timeout
-        
+
         # Precompute cached variables
         self.ref_latency_cache = None
         self.jit_input_tensors = None
         self.ref_input_tensors = None
-    
+
     def run(self, *args: Any, **kwds: Any) -> Any:
         sig = inspect.signature(self.fn)
         bound_args = sig.bind(*args, **kwds)
@@ -87,16 +91,27 @@ class Autotuner:
             atol = jit_context.atol
 
             self.jit_input_tensors = mod._get_inputs(
-                with_output = profiler == "tvm"
-            ) if self.jit_input_tensors is None else self.jit_input_tensors
+                with_output=profiler ==
+                "tvm") if self.jit_input_tensors is None else self.jit_input_tensors
 
             if (not skip_check) and (ref_prog is not None):
                 mod.assert_allclose(ref_prog, rtol=rtol, atol=atol)
 
-            latency = mod.do_bench(mod.func, n_warmup=self.warmup, n_repeat=self.rep, profiler=profiler, input_tensors=self.jit_input_tensors)
+            latency = mod.do_bench(
+                mod.func,
+                n_warmup=self.warmup,
+                n_repeat=self.rep,
+                profiler=profiler,
+                input_tensors=self.jit_input_tensors)
             if self.ref_latency_cache is None and ref_prog is not None:
-                self.ref_input_tensors = mod._get_inputs(with_output=False) if self.ref_input_tensors is None else self.ref_input_tensors
-                self.ref_latency_cache = mod.do_bench(ref_prog, n_warmup=self.warmup, n_repeat=self.rep, profiler="torch", input_tensors=self.ref_input_tensors)
+                self.ref_input_tensors = mod._get_inputs(
+                    with_output=False) if self.ref_input_tensors is None else self.ref_input_tensors
+                self.ref_latency_cache = mod.do_bench(
+                    ref_prog,
+                    n_warmup=self.warmup,
+                    n_repeat=self.rep,
+                    profiler="torch",
+                    input_tensors=self.ref_input_tensors)
 
             return latency, self.ref_latency_cache
 
@@ -122,7 +137,6 @@ class Autotuner:
                 logging.error(f"An error occurred while testing config {config}: {e}")
                 continue
 
-
             logging.info(f"Config {config} latency: {latency}")
 
             progress_bar.set_postfix({"best_latency": best_latency})
@@ -136,37 +150,41 @@ class Autotuner:
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         return self.run(*args, **kwds)
 
-def autotune(configs: Any, keys: List[str], warmup: int = 25, rep: int = 100, timeout: int = 100) -> Callable:
+
+def autotune(configs: Any,
+             keys: List[str],
+             warmup: int = 25,
+             rep: int = 100,
+             timeout: int = 100) -> Callable:
     """
     Decorator for tl program
     """
+
     def decorator(fn: Callable) -> Autotuner:
         return Autotuner(fn, configs=configs, keys=keys, warmup=warmup, rep=rep, timeout=timeout)
+
     return decorator
 
-def jit(
-    out_idx: List[int], 
-    supply_type: tl.TensorSupplyType = tl.TensorSupplyType.Normal, 
-    ref_prog: Callable = None,
-    rtol: float = 1e-2,
-    atol: float = 1e-2,
-    skip_check: bool = False, 
-    profiler: Literal['torch', 'tvm']='torch',
-    target: Literal['cuda', 'hip']='cuda'
-) -> Callable:
+
+def jit(out_idx: List[int],
+        supply_type: tl.TensorSupplyType = tl.TensorSupplyType.Normal,
+        ref_prog: Callable = None,
+        rtol: float = 1e-2,
+        atol: float = 1e-2,
+        skip_check: bool = False,
+        profiler: Literal['torch', 'tvm'] = 'torch',
+        target: Literal['cuda', 'hip'] = 'cuda') -> Callable:
 
     def wrapper(fn: Callable):
 
         @wraps(fn)
         def decorator(*args, **kwargs) -> float:
             # Enabling Efficient Fusion
-            with tvm.transform.PassContext(config={
-                "tir.merge_static_smem": True
-            }):
+            with tvm.transform.PassContext(config={"tir.merge_static_smem": True}):
                 mod, params = tl.lower(fn(*args, **kwargs), target=target)
 
             mod = tl.Profiler(mod, params, out_idx, supply_type)
-            
+
             return JITContext(
                 mod=mod,
                 out_idx=out_idx,
@@ -176,8 +194,8 @@ def jit(
                 atol=atol,
                 skip_check=skip_check,
                 profiler=profiler,
-                target=target
-            )
+                target=target)
 
         return decorator
+
     return wrapper
