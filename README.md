@@ -337,7 +337,6 @@ def dequant_matmul(
 
 ---
 
-
 TileLang has now been used in project [BitBLAS](https://github.com/microsoft/BitBLAS).
 
 Feel free to explore the repository and contribute to the project. If you have any questions or suggestions, please open an issue or contact the authors.
