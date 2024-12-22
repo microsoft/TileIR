@@ -24,7 +24,10 @@ def is_host_call(func: tir.PrimFunc):
 @tvm.register_func("tvm_callback_cuda_compile", override=True)
 def tvm_callback_cuda_compile(code, target):
     project_root = osp.join(osp.dirname(__file__), "../..")
-    tl_template_path = osp.abspath(osp.join(project_root, "src"))
+    if "TL_TEMPLATE_PATH" in os.environ:
+        tl_template_path = os.environ["TL_TEMPLATE_PATH"]
+    else:
+        tl_template_path = osp.abspath(osp.join(project_root, "src"))
     # TODO(lei): this indeed should be renamed into
     # TL_CUTLASS_INCLUDE_PATH
     if "TL_CUTLASS_PATH" in os.environ:

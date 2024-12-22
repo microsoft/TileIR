@@ -13,3 +13,10 @@ if [ -d build ]; then
 fi
 
 python setup.py bdist_wheel
+
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to build the wheel."
+    exit 1
+else
+    echo "Wheel built successfully."
+fi
