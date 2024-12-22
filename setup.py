@@ -4,8 +4,7 @@
 import io
 import subprocess
 import shutil
-from setuptools import setup, find_packages
-from setuptools.command.install import install
+from setuptools import setup, find_packages, Extension
 from setuptools.command.build_py import build_py
 from setuptools.command.sdist import sdist
 import distutils.dir_util
@@ -19,8 +18,6 @@ import urllib.request
 from distutils.version import LooseVersion
 import platform
 import multiprocessing
-
-from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 
 # Environment variables False/True
@@ -29,9 +26,7 @@ PACKAGE_NAME = "tilelang"
 ROOT_DIR = os.path.dirname(__file__)
 
 # TileLang only supports Linux platform
-assert sys.platform.startswith(
-    "linux"
-), "TileLang only supports Linux platform (including WSL)."
+assert sys.platform.startswith("linux"), "TileLang only supports Linux platform (including WSL)."
 
 
 def get_path(*filepath) -> str:
@@ -127,9 +122,7 @@ def download_and_extract_llvm(version, is_aarch64=False, extract_path="3rdparty"
     elif version >= "13.0.0":
         ubuntu_version = "18.04"
 
-    base_url = (
-        f"https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}"
-    )
+    base_url = (f"https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}")
     file_name = f"clang+llvm-{version}-{'aarch64-linux-gnu' if is_aarch64 else f'x86_64-linux-gnu-ubuntu-{ubuntu_version}'}.tar.xz"
 
     download_url = f"{base_url}/{file_name}"
@@ -253,7 +246,7 @@ class TileLangBuilPydCommand(build_py):
                 shutil.copy2(source_dir, target_dir)
             else:
                 print(f"INFO: {source_dir} does not exist.")
-        
+
         TVM_CONFIG_ITEMS = [
             f"{build_temp_dir}/config.cmake",
         ]
@@ -347,8 +340,7 @@ class TileLangSdistCommand(sdist):
     def make_distribution(self):
         self.distribution.metadata.name = PACKAGE_NAME
         self.distribution.metadata.version = get_tilelang_version(
-            with_cuda=False, with_system_info=False
-        )
+            with_cuda=False, with_system_info=False)
         super().make_distribution()
 
 
@@ -383,12 +375,9 @@ class CMakeBuild(build_ext):
         # Check if CMake is installed and accessible by attempting to run 'cmake --version'.
         try:
             subprocess.check_output(["cmake", "--version"])
-        except OSError:
+        except OSError as e:
             # If CMake is not found, raise an error.
-            raise RuntimeError(
-                "CMake must be installed to build the following extensions: "
-                + ", ".join(e.name for e in self.extensions)
-            )
+            raise RuntimeError("CMake must be installed to build the following extensions") from e
 
         # Build each extension (of type CMakeExtension) using our custom method.
         for ext in self.extensions:
@@ -420,9 +409,7 @@ class CMakeBuild(build_ext):
         os.makedirs(build_temp, exist_ok=True)
 
         # Copy the default 'config.cmake' from the source tree into our build directory.
-        src_config_cmake = os.path.join(
-            ext.sourcedir, "3rdparty", "tvm", "cmake", "config.cmake"
-        )
+        src_config_cmake = os.path.join(ext.sourcedir, "3rdparty", "tvm", "cmake", "config.cmake")
         dst_config_cmake = os.path.join(build_temp, "config.cmake")
         shutil.copy(src_config_cmake, dst_config_cmake)
 
@@ -436,18 +423,14 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
 
         # Build the project in "Release" mode with all available CPU cores ("-j").
-        subprocess.check_call(
-            ["cmake", "--build", ".", "--config", "Release", "-j"], cwd=build_temp
-        )
+        subprocess.check_call(["cmake", "--build", ".", "--config", "Release", "-j"],
+                              cwd=build_temp)
 
 
 setup(
     name=PACKAGE_NAME,
-    version=(
-        get_tilelang_version(with_cuda=False, with_system_info=False)
-        if PYPI_BUILD
-        else get_tilelang_version()
-    ),
+    version=(get_tilelang_version(with_cuda=False, with_system_info=False)
+             if PYPI_BUILD else get_tilelang_version()),
     packages=find_packages(where="."),
     package_dir={"": "."},
     author="Microsoft Research",
