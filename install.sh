@@ -114,8 +114,7 @@ cd ../../..
 
 # Step 11: Set environment variables
 echo "Configuring environment variables for TVM..."
-echo "export TVM_HOME=$(pwd)/3rdparty/tvm" >> ~/.bashrc
-echo "export PYTHONPATH=\$TVM_HOME/python:$(pwd):\$PYTHONPATH" >> ~/.bashrc
+echo "export PYTHONPATH=$(pwd):\$PYTHONPATH" >> ~/.bashrc
 echo "export CUDA_DEVICE_ORDER=PCI_BUS_ID" >> ~/.bashrc
 
 # Step 12: Source .bashrc to apply changes
