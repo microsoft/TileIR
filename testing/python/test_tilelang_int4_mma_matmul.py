@@ -3,6 +3,8 @@
 
 import torch
 import torch.backends
+import tilelang
+print(tilelang.__path__)
 from tilelang import tvm as tvm
 import tilelang.testing
 import tilelang as TL
@@ -401,7 +403,7 @@ def assert_tl_matmul_weight_only_transform_correctness(M, N, K, in_dtype, out_dt
     print(ref_c)
     torch.testing.assert_close(C, ref_c, rtol=1e-2, atol=1e-2)
 
-
+@tilelang.testing.requires_package("bitblas")
 def test_assert_tl_matmul_weight_only_transform():
     assert_tl_matmul_weight_only_transform_correctness(128, 128, 128, "int8", "int32", "int32")
 
