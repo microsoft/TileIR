@@ -1,0 +1,9 @@
+include VERSION
+include CMakeLists.txt
+include requirements.txt
+include requirements-test.txt
+include requirements-dev.txt
+recursive-include src *
+recursive-include 3rdparty *
+recursive-exclude 3rdparty/clang* * 
+recursive-exclude 3rdparty/llvm* *

@@ -73,6 +73,3 @@ models/frozenmodels/
 
 # .ruff_cache
 .ruff_cache
-
-# .bitblas_database
-.bitblas_database
