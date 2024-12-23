@@ -234,7 +234,7 @@ class TileLangBuilPydCommand(build_py):
             f"{ext_output_dir}/libtilelang_module.so",
         ]
         for item in TVM_PREBUILD_ITEMS:
-            source_dir = os.path.join(ROOT_DIR, item)
+            source_lib_file = os.path.join(ROOT_DIR, item)
             # only copy the file
             file_name = os.path.basename(item)
             target_dir = os.path.join(self.build_lib, PACKAGE_NAME, file_name)
@@ -242,10 +242,12 @@ class TileLangBuilPydCommand(build_py):
             target_dir = os.path.join(target_dir, "lib")
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
-            if os.path.exists(source_dir):
-                shutil.copy2(source_dir, target_dir)
+            if os.path.exists(source_lib_file):
+                shutil.copy2(source_lib_file, target_dir)
+                # remove the original file
+                os.remove(source_lib_file)
             else:
-                print(f"INFO: {source_dir} does not exist.")
+                print(f"INFO: {source_lib_file} does not exist.")
 
         TVM_CONFIG_ITEMS = [
             f"{build_temp_dir}/config.cmake",
@@ -454,7 +456,7 @@ setup(
     python_requires=">=3.8",
     install_requires=get_requirements(),
     package_data=package_data,
-    include_package_data=True,
+    include_package_data=False,
     ext_modules=[CMakeExtension("TileLangCXX", sourcedir=".")],
     cmdclass={
         "build_py": TileLangBuilPydCommand,
