@@ -38,7 +38,7 @@ TileLang achieves exceptional performance across a variety of computational patt
 - MatrixCore FP16 GEMM Performance Vs. Baselines on MI300X
 
   <div>
-    <img src="./images/op_benchmark_mi300_fp16_gemm.png" alt="gemm fp16 performance on MI300X" />
+    <img src="./images/op_benchmark_mi300_fp16_gemm_normalized_latency.png" alt="gemm fp16 performance on MI300X" />
   </div>
 
 ## Installation
