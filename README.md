@@ -29,6 +29,12 @@ Within the source repository, you will also find additional complex kernels—su
 
 TileLang achieves exceptional performance across a variety of computational patterns. Below are selected results showcasing its capabilities:
 
+- MatrixCore FP16 GEMM Performance Vs. Vendor Library on MI300X
+
+  <div>
+    <img src="./images/op_benchmark_mi300_fp16_gemm.png" alt="gemm fp16 performance on MI300X" />
+  </div>
+
 ## Installation
 ### Method 1: Install with Pip
 
