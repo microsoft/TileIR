@@ -8,11 +8,7 @@ if [ -d dist ]; then
     rm -r dist
 fi
 
-if [ -d build ]; then
-    rm -r build
-fi
-
-python setup.py bdist_wheel
+python -m build --wheel -o dist
 
 if [ $? -ne 0 ]; then
     echo "Error: Failed to build the wheel."
