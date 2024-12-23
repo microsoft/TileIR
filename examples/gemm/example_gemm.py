@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 import tilelang
 from tilelang import Profiler
 import tilelang.language as T

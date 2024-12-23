@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 import tilelang
 from tilelang import Profiler
 import tilelang.language as T
@@ -249,7 +252,7 @@ def ref_program(A, qB):
     C = torch.matmul(A.to(torch.float), B.T.to(torch.float))
     C = C.to(torch.__getattribute__(dtypeC))
     return C.transpose(0, 1)
-    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--m', type=int, default=256, help='M')
