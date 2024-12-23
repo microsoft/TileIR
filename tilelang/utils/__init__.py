@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """The profiler and convert to torch utils"""
+# TODO(lei): Separate the profiler and convert to individual files
 
 from typing import Any, List, Literal
 from enum import Enum

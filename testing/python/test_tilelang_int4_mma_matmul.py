@@ -4,8 +4,6 @@
 import torch
 import torch.backends
 import tilelang
-
-print(tilelang.__path__)
 from tilelang import tvm as tvm
 import tilelang.testing
 import tilelang as TL
