@@ -18,13 +18,16 @@ Although tile-lang aims to be portable across a range of Devices, it has been sp
 ## OP Implementation Examples
 **tile-lang** provides the building blocks to implement a wide variety of operators. Some examples include:
 
-- [Matrix Multiplication](#quick-start)
-- [Flash Attention](#flash-attention)
-- [Dequantization GEMM](#dequantization-gemm)
-- [RetNet](#retina-net)
-- [MAMBA](#mamba)
+- [Matrix Multiplication](./examples/gemm/)
+- [Dequantization GEMM](./examples/dequantize_gemm/)
+- [Flash Attention](./examples/flash_attention/)
+- [Flash Linear Attention](./examples/linear_attention/)
 
 Within the source repository, you will also find additional complex kernels—such as convolutions, forward/backward passes for FlashAttention v2, and normalization layers—built using tile-lang’s composable primitives.
+
+## Benchmark Summary
+
+TileLang achieves exceptional performance across a variety of computational patterns. Below are selected results showcasing its capabilities:
 
 ## Installation
 ### Method 1: Install with Pip
