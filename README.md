@@ -23,7 +23,7 @@ Although tile-lang aims to be portable across a range of Devices, it has been sp
 - [Flash Attention](./examples/flash_attention/)
 - [Flash Linear Attention](./examples/linear_attention/)
 
-Within the source repository, you will also find additional complex kernels—such as convolutions, forward/backward passes for FlashAttention v2, and normalization layers—built using tile-lang’s composable primitives.
+Within the `examples` repository, you will also find additional complex kernels—such as convolutions, forward/backward passes for FlashAttention.
 
 ## Benchmark Summary
 
