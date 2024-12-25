@@ -1,3 +1,13 @@
+[build-system]
+requires = [
+    "cmake>=3.26",
+    "packaging",
+    "setuptools>=61",
+    "setuptools-scm>=8.0",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
 [tool.yapf]
 based_on_style = "yapf"
 column_limit = 100
