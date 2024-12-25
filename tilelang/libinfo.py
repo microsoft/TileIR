@@ -24,7 +24,7 @@ def get_dll_directories():
     source_dir = os.path.abspath(os.path.join(curr_dir, ".."))
     dll_path = [
         curr_dir,
-        os.path.join(source_dir, "."), # pypi build
+        os.path.join(curr_dir, "lib"), # pypi build
         os.path.join(source_dir, "build"),  # local build
         os.path.join(source_dir, "build", "Release"),
     ]
