@@ -380,7 +380,7 @@ class CMakeBuild(build_ext):
         except OSError as e:
             # If CMake is not found, raise an error.
             raise RuntimeError("CMake must be installed to build the following extensions") from e
-        
+
         update_submodules()
 
         # Build each extension (of type CMakeExtension) using our custom method.
