@@ -59,9 +59,7 @@ class Autotuner:
         sig = inspect.signature(self.fn)
         bound_args = sig.bind(*args, **kwds)
         bound_args.apply_defaults()
-        # print("auto-tunner bound_args:")
-        # for name, value in bound_args.arguments.items():
-        #     print(f"{name} = {value}")
+
         best_latency = 1e8
         best_config = None
 
@@ -158,8 +156,8 @@ def jit(out_idx: List[int],
         rtol: float = 1e-2,
         atol: float = 1e-2,
         skip_check: bool = False,
-        profiler: Literal['torch', 'tvm'] = 'torch',
-        target: Literal['cuda', 'hip'] = 'cuda') -> Callable:
+        profiler: Literal['auto', 'torch', 'tvm'] = 'auto',
+        target: Literal['auto', 'cuda', 'hip'] = 'auto') -> Callable:
 
     def wrapper(fn: Callable):
 

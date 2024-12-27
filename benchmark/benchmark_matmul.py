@@ -104,8 +104,7 @@ def get_configs(M, N, K, with_roller=False):
                 num_stages,
                 thread_num,
                 enable_rasterization,
-            )
-        )
+            ))
 
         configs = [
             {
@@ -115,8 +114,7 @@ def get_configs(M, N, K, with_roller=False):
                 "num_stages": c[3],
                 "thread_num": c[4],
                 "enable_rasteration": c[5],  # keep param name for backward-compat
-            }
-            for c in _configs
+            } for c in _configs
         ]
     return configs
 
@@ -159,10 +157,9 @@ def matmul(M, N, K, with_roller):
         # check out bitblas is installed
         try:
             import bitblas  # noqa: F401
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "BitBlas is not installed. Please install it via 'pip install bitblas'."
-            )
+                "BitBlas is not installed. Please install it via 'pip install bitblas'.") from e
 
     @autotune(
         configs=get_configs(M, N, K, with_roller),
@@ -182,7 +179,7 @@ def matmul(M, N, K, with_roller):
         supply_type=tl.TensorSupplyType.Integer,
         ref_prog=ref_program,
         skip_check=True,
-        profiler="tvm",
+        profiler="auto",
         target="auto",
     )
     def kernel(
@@ -225,9 +222,9 @@ def matmul(M, N, K, with_roller):
 
         @T.prim_func
         def main(
-            A: T.Buffer((M, K), dtype),
-            B: T.Buffer((N, K), dtype),
-            C: T.Buffer((M, N), dtype),
+                A: T.Buffer((M, K), dtype),
+                B: T.Buffer((N, K), dtype),
+                C: T.Buffer((M, N), dtype),
         ):
             """
             The compiled TVM function for block-level matrix multiplication.
@@ -242,8 +239,7 @@ def matmul(M, N, K, with_roller):
             # Bind x-dimension to block index in N,
             #     y-dimension to block index in M.
             with T.Kernel(
-                T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=thread_num
-            ) as (bx, by):
+                    T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=thread_num) as (bx, by):
 
                 # Allocate shared memory for A sub-block of shape (block_M, block_K)
                 A_shared = T.alloc_shared((block_M, block_K), dtype)
@@ -259,9 +255,7 @@ def matmul(M, N, K, with_roller):
                 T.clear(C_local)
 
                 # Loop over sub-blocks in K dimension, pipelined by num_stages
-                for k in T.Pipelined(
-                    T.ceildiv(K, block_K), num_stages=num_stages
-                ):
+                for k in T.Pipelined(T.ceildiv(K, block_K), num_stages=num_stages):
                     # Load a sub-block of A from global memory into A_shared
                     T.copy(
                         A[by * block_M, k * block_K],
@@ -291,15 +285,9 @@ def matmul(M, N, K, with_roller):
 if __name__ == "__main__":
     # Parse command-line arguments for matrix dimensions
     parser = argparse.ArgumentParser(description="Autotuned MatMul Benchmark")
-    parser.add_argument(
-        "--m", type=int, default=8192, help="Matrix dimension M"
-    )
-    parser.add_argument(
-        "--n", type=int, default=8192, help="Matrix dimension N"
-    )
-    parser.add_argument(
-        "--k", type=int, default=8192, help="Matrix dimension K"
-    )
+    parser.add_argument("--m", type=int, default=8192, help="Matrix dimension M")
+    parser.add_argument("--n", type=int, default=8192, help="Matrix dimension N")
+    parser.add_argument("--k", type=int, default=8192, help="Matrix dimension K")
     parser.add_argument(
         "--with_roller",
         action="store_true",

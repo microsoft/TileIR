@@ -9,16 +9,12 @@ from typing import Literal, Union
 from tilelang import tvm as tvm
 from tvm import tir, relay
 from tvm.target import Target
-from tvm.contrib import rocm
-from tilelang.engine import hipcc, nvcc
+from tilelang.contrib import hipcc, nvcc
+from tilelang.utils import determine_target
 
 
 def is_device_call(func: tir.PrimFunc):
-    return bool(
-        func.attrs
-        and "calling_conv" in func.attrs
-        and func.attrs["calling_conv"] == 2
-    )
+    return bool(func.attrs and "calling_conv" in func.attrs and func.attrs["calling_conv"] == 2)
 
 
 def is_host_call(func: tir.PrimFunc):
@@ -37,12 +33,8 @@ def tvm_callback_cuda_compile(code, target):
     if "TL_CUTLASS_PATH" in os.environ:
         cutlass_path = os.environ["TL_CUTLASS_PATH"]
     else:
-        cutlass_path = osp.abspath(
-            osp.join(project_root, "3rdparty/cutlass/include")
-        )
-    compute_version = "".join(
-        nvcc.get_target_compute_version(target).split(".")
-    )
+        cutlass_path = osp.abspath(osp.join(project_root, "3rdparty/cutlass/include"))
+    compute_version = "".join(nvcc.get_target_compute_version(target).split("."))
 
     # special handle for Hopper
     if compute_version == "90":
@@ -81,9 +73,7 @@ def tvm_callback_hip_compile(code, target):
     if "TL_COMPOSABLE_KERNEL_PATH" in os.environ:
         ck_path = os.environ["TL_COMPOSABLE_KERNEL_PATH"]
     else:
-        ck_path = osp.abspath(
-            osp.join(project_root, "3rdparty/composable_kernel/include")
-        )
+        ck_path = osp.abspath(osp.join(project_root, "3rdparty/composable_kernel/include"))
 
     hsaco = hipcc.compile_hip(
         code,
@@ -101,60 +91,10 @@ def tvm_callback_hip_compile(code, target):
 
 def extrac_params(func: tir.PrimFunc):
     buffers = [func.buffer_map[var] for var in func.params]
-    tensor_types = [
-        relay.TensorType(buffer.shape, buffer.dtype) for buffer in buffers
-    ]
+    tensor_types = [relay.TensorType(buffer.shape, buffer.dtype) for buffer in buffers]
     return tensor_types
 
 
-def detect_target(target: str = "auto") -> str:
-    """Detect the computing target (CUDA or ROCm) based on the environment.
-
-    Args:
-        target (str): The target to detect. Use "auto" for automatic detection.
-                      Can also specify "cuda" or "hip" explicitly.
-
-    Returns:
-        str: The detected target, either "cuda" or "hip".
-
-    Raises:
-        ValueError: If auto-detection is enabled and no valid target is found.
-    """
-
-    def is_cuda_available() -> bool:
-        """Check if CUDA is available."""
-        try:
-            nvcc.find_cuda_path()
-            return True
-        except RuntimeError:
-            return False
-
-    def is_rocm_available() -> bool:
-        """Check if ROCm is available."""
-        try:
-            rocm.find_rocm_path()
-            return True
-        except RuntimeError:
-            return False
-
-    if target == "auto":
-        if is_cuda_available():
-            return "cuda"
-        if is_rocm_available():
-            return "hip"
-        raise ValueError(
-            "Cannot detect the target: no CUDA or ROCm installation found."
-        )
-
-    if target not in {"cuda", "hip"}:
-        raise ValueError(
-            f"Invalid target: {target}. Must be 'cuda', 'hip', or 'auto'."
-        )
-
-    return target
-
-
-# TODO(lei): Should enhance to support IRModule with multiple functions
 def lower(
     func_or_mod: Union[tir.PrimFunc, tvm.IRModule],
     target: Union[Literal["auto", "cuda", "hip"], Target] = "auto",
@@ -169,36 +109,9 @@ def lower(
         mod = tvm.IRModule({func.attrs["global_symbol"]: func})
 
     if isinstance(target, str):
-        target = detect_target(target)
+        target = determine_target(target)
 
     target_host = tvm.target.Target.canon_target(target_host)
-    if target == "auto":
-        is_cuda_available = False
-        is_hip_available = False
-        try:
-            nvcc.find_cuda_path()
-            is_cuda_available = True
-        except Exception:
-            is_cuda_available = False
-
-        try:
-            rocm.find_rocm_path()
-            is_hip_available = True
-        except Exception:
-            is_hip_available = False
-
-        if is_cuda_available:
-            target = "cuda"
-        elif is_hip_available:
-            target = "hip"
-        else:
-            raise ValueError("No CUDA or HIP available")
-    else:
-        assert isinstance(target, Target) or target in [
-            "cuda",
-            "hip",
-        ], f"Target {target} is not supported"
-
     target = tvm.target.Target(target, target_host)
 
     mod = tir.transform.BindTarget(target)(mod)
@@ -273,9 +186,7 @@ def lower(
     host_mod = tir.transform.CombineContextCall()(host_mod)
 
     if target_host.kind.name == "llvm":
-        host_mod = tvm._ffi.get_global_func("target.build.llvm")(
-            host_mod, target_host
-        )
+        host_mod = tvm._ffi.get_global_func("target.build.llvm")(host_mod, target_host)
     else:
         raise ValueError("Target host is not supported")
 
@@ -287,13 +198,9 @@ def lower(
     if target.kind.name == "cuda":
         # Debug comments to get the code
         # code = tvm._ffi.get_global_func("target.build.tl_debug_codegen")(device_mod, target)
-        device_mod = tvm._ffi.get_global_func("target.build.tilelang_cuda")(
-            device_mod, target
-        )
+        device_mod = tvm._ffi.get_global_func("target.build.tilelang_cuda")(device_mod, target)
     elif target.kind.name == "hip":
-        device_mod = tvm._ffi.get_global_func("target.build.tilelang_hip")(
-            device_mod, target
-        )
+        device_mod = tvm._ffi.get_global_func("target.build.tilelang_hip")(device_mod, target)
     else:
         raise ValueError("Target is not supported")
 

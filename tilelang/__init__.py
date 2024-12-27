@@ -132,10 +132,8 @@ if os.environ.get("TL_CUTLASS_PATH", None) is None:
         logger.warning(CUTLASS_NOT_FOUND_MESSAGE)
 
 if os.environ.get("TL_TEMPLATE_PATH", None) is None:
-    install_tl_template_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "src")
-    develop_tl_template_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "src")
+    install_tl_template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+    develop_tl_template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")
     if os.path.exists(install_tl_template_path):
         os.environ["TL_TEMPLATE_PATH"] = install_tl_template_path
     elif (os.path.exists(develop_tl_template_path) and develop_tl_template_path not in sys.path):
@@ -167,9 +165,7 @@ if SKIP_LOADING_TILELANG_SO == "0":
 
 from .utils import (
     Profiler,  # noqa: F401
-    ConvertTorch,  # noqa: F401
     TensorSupplyType,  # noqa: F401
-    cached,  # noqa: F401
 )
 from .layout import (
     Layout,  # noqa: F401
