@@ -86,7 +86,7 @@ cd ../../..
 
 # Define the lines to be added
 TVM_HOME_ENV="export TVM_HOME=$(pwd)/3rdparty/tvm"
-BITBLAS_PYPATH_ENV="export PYTHONPATH=\$TVM_HOME/python:$(pwd):\$PYTHONPATH"
+TILELANG_PYPATH_ENV="export PYTHONPATH=\$TVM_HOME/python:$(pwd):\$PYTHONPATH"
 CUDA_DEVICE_ORDER_ENV="export CUDA_DEVICE_ORDER=PCI_BUS_ID"
 
 # Check and add the first line if not already present
@@ -98,8 +98,8 @@ else
 fi
 
 # Check and add the second line if not already present
-if ! grep -qxF "$BITBLAS_PYPATH_ENV" ~/.bashrc; then
-    echo "$BITBLAS_PYPATH_ENV" >> ~/.bashrc
+if ! grep -qxF "$TILELANG_PYPATH_ENV" ~/.bashrc; then
+    echo "$TILELANG_PYPATH_ENV" >> ~/.bashrc
     echo "Added PYTHONPATH to ~/.bashrc"
 else
     echo "PYTHONPATH is already set in ~/.bashrc"
