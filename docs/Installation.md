@@ -80,8 +80,8 @@ If you already have a compatible TVM installation, follow these steps:
 1. **Clone the Repository:**
 
     ```bash
-    git clone --recursive https://github.com/TileLang/tile-lang
-    cd tile-lang
+    git clone --recursive https://github.com/Microsoft/TileLang
+    cd TileLang
     ```
 
    > **Note**: Use the `--recursive` flag to include necessary submodules.
@@ -114,8 +114,8 @@ If you prefer to use the built-in TVM version, follow these instructions:
 1. **Clone the Repository:**
 
     ```bash
-    git clone --recursive https://github.com/TileLang/tile-lang
-    cd tile-lang
+    git clone --recursive https://github.com/Microsoft/TileLang
+    cd TileLang
     ```
 
    > **Note**: Ensure the `--recursive` flag is included to fetch submodules.
@@ -129,7 +129,8 @@ If you prefer to use the built-in TVM version, follow these instructions:
     cp 3rdparty/tvm/cmake/config.cmake build
     cd build
     echo "set(USE_LLVM ON)" >> config.cmake
-    echo "set(USE_CUDA ON)" >> config.cmake
+    echo "set(USE_CUDA ON)" >> config.cmake 
+    # or echo "set(USE_ROCM ON)" >> config.cmake if want to enable rocm runtime
     cmake ..
     make -j 16
     ```
@@ -141,7 +142,7 @@ If you prefer to use the built-in TVM version, follow these instructions:
     Ensure the `tile-lang` Python package is in your `PYTHONPATH`:
 
     ```bash
-    export PYTHONPATH=/your/path/to/tile-lang/python:$PYTHONPATH
+    export PYTHONPATH=/your/path/to/TileLang/python:$PYTHONPATH
     ```
 
 ### Method 3: Install Using the Provided Script
@@ -151,14 +152,15 @@ For a simplified installation, use the provided script:
 1. **Clone the Repository:**
 
     ```bash
-    git clone --recursive https://github.com/TileLang/tile-lang
-    cd tile-lang
+    git clone --recursive https://github.com/Microsoft/TileLang
+    cd TileLang
     ```
 
 2. **Run the Installation Script:**
 
     ```bash
     bash install.sh
+    # or bash `install_amd.sh` if you want to enable rocm runtime
     ```
 
 This script automates the setup, including submodule initialization and configuration.

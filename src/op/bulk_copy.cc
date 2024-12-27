@@ -14,8 +14,8 @@
 #include <tvm/tir/op_attr_types.h>
 
 #include "../target/utils.h"
+#include "../target/cuda.h"
 #include "builtin.h"
-#include "cuda.h"
 
 namespace tvm {
 namespace tl {
