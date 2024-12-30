@@ -4,8 +4,8 @@
 import tilelang
 from tilelang import Profiler
 import tilelang.language as T
-from bitblas.tl.utils import (
-    make_swizzle_layout,
+from tilelang.intrinsics import (
+    make_mma_swizzle_layout as make_swizzle_layout,
 )
 
 
@@ -25,24 +25,15 @@ def matmul(
             B_shared = T.alloc_shared((block_K, block_N), dtype)
             C_local = T.alloc_fragment((block_M, block_N), accum_dtype)
 
-            # Apply memory layout optimizations
-            # Or you can define your own memory layout
-            T.annotate_layout(
-                {
-                    A_shared: make_swizzle_layout(A_shared),
-                    B_shared: make_swizzle_layout(B_shared),
-                }
-            )
-
             # Enable rasterization for better L2 Cache Locality
-            T.use_swizzle(panel_size=10, enable=enable_rasterization)
+            T.use_swizzle(panel_size=10)
 
             # Clear the local buffer
             T.clear(C_local)
 
             # Auto pipeline the computation
-            for k in T.Pipelined(T.ceildiv(K, block_K), num_stages=3):
-                T.copy(A[by * block_M, k * block_K], A_shared)
+            for ko in T.Pipelined(T.ceildiv(K, block_K), num_stages=3):
+                T.copy(A[by * block_M, ko * block_K], A_shared)
 
                 # Instead of using
                 # T.copy(B[k * block_K, bx * block_N], B_shared)
