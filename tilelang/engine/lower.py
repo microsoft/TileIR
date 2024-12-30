@@ -29,7 +29,7 @@ def tvm_callback_cuda_compile(code, target):
     else:
         tl_template_path = osp.abspath(osp.join(project_root, "src"))
     # TODO(lei): this indeed should be renamed into
-    # TL_CUTLASS_INCLUDE_PATH
+    # TL_CUTLASS_INCLUDE_PATH in the future
     if "TL_CUTLASS_PATH" in os.environ:
         cutlass_path = os.environ["TL_CUTLASS_PATH"]
     else:
@@ -69,7 +69,7 @@ def tvm_callback_hip_compile(code, target):
     tl_template_path = osp.abspath(osp.join(project_root, "src"))
 
     # TODO(lei): actually this indeed should be renamed into
-    # TL_COMPOSABLE_KERNEL_INCLUDE_PATH
+    # TL_COMPOSABLE_KERNEL_INCLUDE_PATH in the future
     if "TL_COMPOSABLE_KERNEL_PATH" in os.environ:
         ck_path = os.environ["TL_COMPOSABLE_KERNEL_PATH"]
     else:
