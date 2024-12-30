@@ -34,9 +34,7 @@ def check_hip_availability() -> bool:
         return False
 
 
-def determine_target(
-    target: Union[str, Target, Literal["auto"]]
-) -> Union[str, Target]:
+def determine_target(target: Union[str, Target, Literal["auto"]]) -> Union[str, Target]:
     """
     Determine the appropriate target for compilation (CUDA, HIP, or manual selection).
 

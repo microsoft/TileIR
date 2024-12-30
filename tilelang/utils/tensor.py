@@ -24,23 +24,17 @@ def get_tensor_supply(supply_type: TensorSupplyType):
         # torch.cuda.manual_seed(0)
         shape = list(map(int, tensor.shape))
         if dtype == torch.int8 and supply_type in [
-            TensorSupplyType.Uniform,
-            TensorSupplyType.Normal,
+                TensorSupplyType.Uniform,
+                TensorSupplyType.Normal,
         ]:
             return torch.ones(*shape, device=device, dtype=dtype)
 
         if supply_type == TensorSupplyType.Integer:
-            return torch.randint(
-                low=-2, high=3, size=shape, device=device, dtype=dtype
-            )
+            return torch.randint(low=-2, high=3, size=shape, device=device, dtype=dtype)
         elif supply_type == TensorSupplyType.Uniform:
-            return torch.empty(*shape, device=device, dtype=dtype).uniform_(
-                -1.0, 1.0
-            )
+            return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
         elif supply_type == TensorSupplyType.Normal:
-            return torch.empty(*shape, device=device, dtype=dtype).normal_(
-                -1.0, 1.0
-            )
+            return torch.empty(*shape, device=device, dtype=dtype).normal_(-1.0, 1.0)
         elif supply_type == TensorSupplyType.Randn:
             return torch.randn(*shape, device=device).to(dtype)
         elif supply_type == TensorSupplyType.Zero:
@@ -106,10 +100,8 @@ def torch_assert_close(
 
     # Print debug information about the mismatch
     if verbose:
-        print(
-            f"Number of mismatched elements: {num_mismatched} / {total_elements} "
-            f"(allowed: {max_allowed_mismatched})"
-        )
+        print(f"Number of mismatched elements: {num_mismatched} / {total_elements} "
+              f"(allowed: {max_allowed_mismatched})")
 
     # Check if the number of mismatched elements exceeds the allowed threshold
     if num_mismatched > max_allowed_mismatched:
@@ -117,7 +109,6 @@ def torch_assert_close(
             f"Too many mismatched elements: {num_mismatched} > {max_allowed_mismatched} "
             f"({max_mismatched_ratio * 100:.2f}% allowed). "
             f"Greatest absolute difference: {diff.max().item()}, "
-            f"Greatest relative difference: {(diff / (torch.abs(tensor_b) + 1e-12)).max().item()}."
-        )
+            f"Greatest relative difference: {(diff / (torch.abs(tensor_b) + 1e-12)).max().item()}.")
     else:
         return True

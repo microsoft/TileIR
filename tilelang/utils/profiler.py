@@ -22,9 +22,7 @@ from tilelang.utils.tensor import (
 
 class ConvertTorch:
 
-    def __init__(
-        self, mod, params: List[TensorType], result_idx: List[int]
-    ) -> None:
+    def __init__(self, mod, params: List[TensorType], result_idx: List[int]) -> None:
         self.mod = mod
         self.params = params
         self.result_idx = result_idx
@@ -163,11 +161,7 @@ class Profiler(ConvertTorch):
                 _n_repeat=n_repeat,
             )
         elif profiler == "tvm":
-            ins = (
-                self._get_inputs(with_output=True)
-                if input_tensors is None
-                else input_tensors
-            )
+            ins = (self._get_inputs(with_output=True) if input_tensors is None else input_tensors)
             target = "cuda"
 
             with suppress(Exception):
@@ -177,8 +171,7 @@ class Profiler(ConvertTorch):
 
             device = tvm.cuda(0) if target == "cuda" else tvm.rocm(0)
             time_evaluator = self.mod.time_evaluator(
-                self.mod.entry_name, device, number=rep, repeat=n_repeat
-            )
+                self.mod.entry_name, device, number=rep, repeat=n_repeat)
             tvm_inputs = [ndarray.from_dlpack(to_dlpack(inp)) for inp in ins]
             # Transform Latency to ms
             return time_evaluator(*tvm_inputs).mean * 1e3
@@ -195,8 +188,7 @@ class Profiler(ConvertTorch):
 
             ins = self._get_inputs(with_output=True)
             time_evaluator = self.mod.time_evaluator(
-                self.mod.entry_name, tvm.cuda(0), number=rep, repeat=n_repeat
-            )
+                self.mod.entry_name, tvm.cuda(0), number=rep, repeat=n_repeat)
             tvm_inputs = [ndarray.from_dlpack(to_dlpack(inp)) for inp in ins]
             tvm_res = time_evaluator(*tvm_inputs).mean * 1e3
             return min(torch_res, tvm_res)
@@ -262,9 +254,7 @@ def do_bench(
         n_warmup = _n_warmup
     if _n_repeat > 0:
         n_repeat = _n_repeat
-    start_event = [
-        torch.cuda.Event(enable_timing=True) for i in range(n_repeat)
-    ]
+    start_event = [torch.cuda.Event(enable_timing=True) for i in range(n_repeat)]
     end_event = [torch.cuda.Event(enable_timing=True) for i in range(n_repeat)]
     # Warm-up
     for _ in range(n_warmup):
@@ -290,9 +280,7 @@ def do_bench(
         dtype=torch.float,
     )
     if quantiles is not None:
-        ret = torch.quantile(
-            times, torch.tensor(quantiles, dtype=torch.float)
-        ).tolist()
+        ret = torch.quantile(times, torch.tensor(quantiles, dtype=torch.float)).tolist()
         if len(ret) == 1:
             ret = ret[0]
         return ret
