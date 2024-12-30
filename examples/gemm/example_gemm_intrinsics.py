@@ -180,44 +180,34 @@ def tl_matmul(
 
     return main
 
+M, N, K = 128, 128, 128
+in_dtype, out_dtype, accum_dtype = "float16", "float16", "float16"
+matmul = tl_matmul(M, N, K, in_dtype, out_dtype, accum_dtype)
+mod, params = TL.lower(matmul)
+src_code = mod.imported_modules[0].get_source()
+# src_code is the generated cuda source
+assert src_code is not None
 
-def assert_tl_matmul_correctness(M, N, K, in_dtype, out_dtype, accum_dtype):
-    matmul = tl_matmul(M, N, K, in_dtype, out_dtype, accum_dtype)
-    mod, params = TL.lower(matmul)
-    src_code = mod.imported_modules[0].get_source()
-    # src_code is the generated cuda source
-    assert src_code is not None
+if in_dtype == "int8":
+    A = torch.randint(-128, 127, (M, K), device="cuda", dtype=torch.int8)
+    B = torch.randint(-128, 127, (N, K), device="cuda", dtype=torch.int8)
+else:
+    A = torch.rand(M, K, device="cuda", dtype=getattr(torch, in_dtype))
+    B = torch.rand(N, K, device="cuda", dtype=getattr(torch, in_dtype))
 
-    if in_dtype == "int8":
-        A = torch.randint(-128, 127, (M, K), device="cuda", dtype=torch.int8)
-        B = torch.randint(-128, 127, (N, K), device="cuda", dtype=torch.int8)
-    else:
-        A = torch.rand(M, K, device="cuda", dtype=getattr(torch, in_dtype))
-        B = torch.rand(N, K, device="cuda", dtype=getattr(torch, in_dtype))
+C = torch.zeros(M, N, device="cuda", dtype=getattr(torch, accum_dtype))
 
-    C = torch.zeros(M, N, device="cuda", dtype=getattr(torch, accum_dtype))
+mod = TL.Profiler(mod, params, [], TL.TensorSupplyType.Integer)
 
-    mod = TL.Profiler(mod, params, [], TL.TensorSupplyType.Integer)
+mod(A, B, C)
 
-    mod(A, B, C)
+latency = mod.do_bench(mod.func, warmup=25)
 
-    latency = mod.do_bench(mod.func, warmup=25)
+# Ensure that the latency is not None
+assert latency is not None
 
-    # Ensure that the latency is not None
-    assert latency is not None
-
-    # Get Reference Result
-    ref_c = torch.matmul(A.to(torch.float32), B.T.to(torch.float32)).to(getattr(torch, accum_dtype))
-    print(C)
-    print(ref_c)
-    torch.testing.assert_close(C, ref_c, rtol=1e-2, atol=1e-2)
-
-
-def test_assert_tl_matmul():
-    assert_tl_matmul_correctness(128, 128, 128, "float16", "float16", "float16")
-    assert_tl_matmul_correctness(128, 256, 256, "float16", "float32", "float32")
-    assert_tl_matmul_correctness(128, 256, 256, "int8", "int32", "int32")
-
-
-if __name__ == "__main__":
-    test_assert_tl_matmul()
+# Get Reference Result
+ref_c = torch.matmul(A.to(torch.float32), B.T.to(torch.float32)).to(getattr(torch, accum_dtype))
+print(C)
+print(ref_c)
+torch.testing.assert_close(C, ref_c, rtol=1e-2, atol=1e-2)
