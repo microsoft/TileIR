@@ -99,19 +99,30 @@ class KernelLaunchFrame(TIRFrame):
         """
         return _kernel_launch_frame_stack.top()
 
-    def get_block_extent(self, dim: int) -> Var:
+    def get_block_extent(self, dim: int) -> int:
         """
         Returns the block extent for the given dimension.
         dim=0 corresponds to blockIdx.x, dim=1 to blockIdx.y, and dim=2 to blockIdx.z.
         """
-        return self.frames[dim].iter_var
+        iter_var = self.frames[dim].iter_var
+        return int(iter_var.dom.extent)
 
-    def get_thread_extent(self, dim: int) -> Var:
+    def get_thread_extent(self, dim: int) -> int:
         """
         Returns the thread extent for the given dimension.
         dim=0 corresponds to threadIdx.x, dim=1 to threadIdx.y, and dim=2 to threadIdx.z.
         """
-        return self.frames[-4 + dim].iter_var
+        iter_var = self.frames[-4 + dim].iter_var
+        return int(iter_var.dom.extent)
+
+    def get_num_threads(self) -> int:
+        """
+        Returns the thread indices from the topmost frame.
+        """
+        num_threads: int = 1
+        for thread_dim in range(3):
+            num_threads *= self.get_thread_extent(thread_dim)
+        return num_threads
 
     @property
     def blocks(self) -> List[Var]:
@@ -127,6 +138,12 @@ class KernelLaunchFrame(TIRFrame):
         """
         return [frame.iter_var.var for frame in self.frames[-4:]]
 
+    @property
+    def num_threads(self) -> int:
+        """
+        Returns the total number of threads.
+        """
+        return self.get_num_threads()
 
 def Kernel(
     *blocks: List[tir.PrimExpr],
