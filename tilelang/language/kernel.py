@@ -99,6 +99,34 @@ class KernelLaunchFrame(TIRFrame):
         """
         return _kernel_launch_frame_stack.top()
 
+    def get_block_extent(self, dim: int) -> Var:
+        """
+        Returns the block extent for the given dimension.
+        dim=0 corresponds to blockIdx.x, dim=1 to blockIdx.y, and dim=2 to blockIdx.z.
+        """
+        return self.frames[dim].iter_var
+
+    def get_thread_extent(self, dim: int) -> Var:
+        """
+        Returns the thread extent for the given dimension.
+        dim=0 corresponds to threadIdx.x, dim=1 to threadIdx.y, and dim=2 to threadIdx.z.
+        """
+        return self.frames[-4 + dim].iter_var
+
+    @property
+    def blocks(self) -> List[Var]:
+        """
+        Returns the block indices from the topmost frame.
+        """
+        return [frame.iter_var.var for frame in self.frames[0:-4]]
+
+    @property
+    def threads(self) -> List[Var]:
+        """
+        Returns the thread indices from the topmost frame.
+        """
+        return [frame.iter_var.var for frame in self.frames[-4:]]
+
 
 def Kernel(
     *blocks: List[tir.PrimExpr],
