@@ -9,22 +9,23 @@ from tvm.tir import IterVar, Var
 from tilelang import _ffi_api
 from tilelang.layout import Layout
 
+
 @tvm._ffi.register_object("tl.Fragment")
 class Fragment(Layout):
     # pylint: disable=super-init-not-called
-    def __init__(self, shape, forward_thread_fn, replicate=1, forward_fn=None):
+    def __init__(self, shape, forward_thread_fn, replicate=1, forward_index_fn=None):
         forward_vars = []
         for idx, size in enumerate(shape):
             iv = IterVar(Range(0, size), Var(f"i{idx}", "int32"), 0)
             forward_vars.append(iv)
         vars = [iv.var for iv in forward_vars]
 
-        forward_index = forward_fn(*vars) if forward_fn else None
+        forward_index = forward_index_fn(*vars) if forward_index_fn else None
+        if not isinstance(forward_index, tvm.ir.container.Array):
+            forward_index = [forward_index]
 
         if replicate > 1:
-            thread_replicate = IterVar(
-                Range(0, replicate), Var("rep", "int32"), 0
-            )
+            thread_replicate = IterVar(Range(0, replicate), Var("rep", "int32"), 0)
             forward_thread = forward_thread_fn(*vars, thread_replicate.var)
         else:
             thread_replicate = None
