@@ -1,15 +1,12 @@
-# Copyright(c) Microsoft Corporation.
-# Licensed under the MIT License.
-# Learn a lot from the MLC - LLM Project
-# https: // github.com/mlc-ai/mlc-llm/blob/main/CMakeLists.txt
+#Copyright(c) Microsoft Corporation.
+#Licensed under the MIT License.
+#Learn a lot from the MLC - LLM Project
+#https: // github.com/mlc-ai/mlc-llm/blob/main/CMakeLists.txt
 
 cmake_minimum_required(VERSION 3.18)
 project(TILE_LANG C CXX)
 
-# Set default build type to Release if not provided
-set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-
-# Define a custom macro for globbing files with conditional CONFIGURE_DEPENDS
+#Define a custom macro for globbing files with conditional CONFIGURE_DEPENDS
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.12.0")
   macro(tilelang_file_glob glob variable)
     file(${glob} ${variable} CONFIGURE_DEPENDS ${ARGN})
@@ -20,10 +17,9 @@ else()
   endmacro()
 endif()
 
-# Handle TVM prebuild path or use default configuration
-if(DEFINED TVM_PREBUILD_PATH)
+#Handle TVM prebuild path or use default configuration
+if (DEFINED TVM_PREBUILD_PATH)
   message(STATUS "TVM_PREBUILD_PATH: ${TVM_PREBUILD_PATH}")
-
   if(EXISTS ${TVM_PREBUILD_PATH}/config.cmake)
     include(${TVM_PREBUILD_PATH}/config.cmake)
   endif()
@@ -34,7 +30,7 @@ else()
     include(${CMAKE_SOURCE_DIR}/config.cmake)
   endif()
 
-  # Set default build type to RelWithDebInfo if not provided
+#Set default build type to RelWithDebInfo if not provided
   if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
     message(STATUS "Setting default build type to ${CMAKE_BUILD_TYPE}")
@@ -44,29 +40,29 @@ endif()
 # include cmake modules
 include(CheckCXXCompilerFlag)
 
-# Enable static runtime build if required
-if(TILE_LANG_INSTALL_STATIC_LIB)
+#Enable static runtime build if required
+if (TILE_LANG_INSTALL_STATIC_LIB)
   set(BUILD_STATIC_RUNTIME ON)
 endif()
 
-# Enforce CUDA standard
+#Enforce CUDA standard
 if(USE_CUDA)
-  set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 17)
 endif()
 
-# Enforce HIP standard
+#Enforce HIP standard
 if(USE_ROCM)
-  set(CMAKE_HIP_STANDARD 17)
-  check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
-  set(CMAKE_CXX_FLAGS "-D__HIP_PLATFORM_AMD__ ${CMAKE_CXX_FLAGS}")
+set(CMAKE_HIP_STANDARD 17)
+check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
+set(CMAKE_CXX_FLAGS "-D__HIP_PLATFORM_AMD__ ${CMAKE_CXX_FLAGS}")
 endif()
 
-# Enforce C++ standard
+#Enforce C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Locate TVM source directory
-if(NOT DEFINED TVM_SOURCE_DIR)
+#Locate TVM source directory
+if (NOT DEFINED TVM_SOURCE_DIR)
   if(DEFINED ENV{TVM_SOURCE_DIR})
     set(TVM_SOURCE_DIR "$ENV{TVM_SOURCE_DIR}")
   else()
@@ -74,8 +70,8 @@ if(NOT DEFINED TVM_SOURCE_DIR)
   endif()
 endif()
 
-# Handle TVM prebuild or build TVM from source
-if(DEFINED TVM_PREBUILD_PATH)
+#Handle TVM prebuild or build TVM from source
+if (DEFINED TVM_PREBUILD_PATH)
   message(STATUS "Using prebuilt TVM from ${TVM_PREBUILD_PATH}")
   add_library(tvm SHARED IMPORTED)
   set_target_properties(tvm PROPERTIES
@@ -92,13 +88,13 @@ else()
   add_subdirectory(${TVM_SOURCE_DIR} tvm EXCLUDE_FROM_ALL)
 endif()
 
-# Collect source files
-tilelang_file_glob(GLOB TILE_LANG_SRCS
-  src/*.cc
-  src/layout/*.cc
-  src/transform/*.cc
-  src/op/*.cc
-  src/target/utils.cc
+#Collect source files
+tilelang_file_glob(GLOB TILE_LANG_SRCS 
+    src/*.cc
+    src/layout/*.cc
+    src/transform/*.cc
+    src/op/*.cc
+    src/target/utils.cc
 )
 
 # Include CUDA source files if CUDA is enabled
@@ -135,32 +131,29 @@ set(TILE_LANG_INCLUDES
 
 # Find CUDA Toolkit
 if(USE_CUDA)
-  find_package(CUDAToolkit REQUIRED)
-
-  if(NOT CUDAToolkit_FOUND)
-    message(FATAL_ERROR "CUDA Toolkit not found. Please set CUDAToolkit_ROOT.")
-  endif()
-
-  message(STATUS "CUDA Toolkit includes: ${CUDAToolkit_INCLUDE_DIRS}")
-  list(APPEND TILE_LANG_INCLUDES ${CUDAToolkit_INCLUDE_DIRS})
+find_package(CUDAToolkit REQUIRED)
+if(NOT CUDAToolkit_FOUND)
+  message(FATAL_ERROR "CUDA Toolkit not found. Please set CUDAToolkit_ROOT.")
+endif()
+message(STATUS "CUDA Toolkit includes: ${CUDAToolkit_INCLUDE_DIRS}")
+list(APPEND TILE_LANG_INCLUDES ${CUDAToolkit_INCLUDE_DIRS})
 endif(USE_CUDA)
 
 # Find ROCM Toolkit
 if(USE_ROCM)
-  find_rocm(${USE_ROCM})
-  message(STATUS "USE_ROCM: ${USE_ROCM}")
+find_rocm(${USE_ROCM})
+message(STATUS "USE_ROCM: ${USE_ROCM}")
+if(ROCM_FOUND)
+  # always set the includedir
+  # avoid global retrigger of cmake
+  include_directories(SYSTEM ${ROCM_INCLUDE_DIRS})
+  add_definitions(-D__HIP_PLATFORM_HCC__=1)
+else()
+  message(FATAL_ERROR "ROCM Toolkit not found. Please set HIP_ROOT.")
+endif(ROCM_FOUND)
 
-  if(ROCM_FOUND)
-    # always set the includedir
-    # avoid global retrigger of cmake
-    include_directories(SYSTEM ${ROCM_INCLUDE_DIRS})
-    add_definitions(-D__HIP_PLATFORM_HCC__=1)
-  else()
-    message(FATAL_ERROR "ROCM Toolkit not found. Please set HIP_ROOT.")
-  endif(ROCM_FOUND)
-
-  message(STATUS "ROCM Toolkit includes: ${ROCM_INCLUDE_DIRS}")
-  list(APPEND TILE_LANG_INCLUDES ${ROCM_INCLUDE_DIRS})
+message(STATUS "ROCM Toolkit includes: ${ROCM_INCLUDE_DIRS}")
+list(APPEND TILE_LANG_INCLUDES ${ROCM_INCLUDE_DIRS})
 endif(USE_ROCM)
 
 # Define compile-time macros
@@ -196,12 +189,12 @@ add_library(tilelang_module SHARED $<TARGET_OBJECTS:tilelang_objs>)
 target_link_libraries(tilelang_module PUBLIC tvm)
 
 # Install targets
-if(TILE_LANG_INSTALL_STATIC_LIB)
+if (TILE_LANG_INSTALL_STATIC_LIB)
   install(TARGETS tilelang_static tvm_runtime
     LIBRARY DESTINATION lib${LIB_SUFFIX}
   )
 else()
-  if(DEFINED TVM_PREBUILD_PATH)
+  if (DEFINED TVM_PREBUILD_PATH)
     install(TARGETS tilelang tilelang_module
       RUNTIME DESTINATION bin
       LIBRARY DESTINATION lib${LIB_SUFFIX}

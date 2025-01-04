@@ -53,27 +53,12 @@ def get_ldmatrix_offset(
         raise ValueError(f"Unsupported dtype {dtype}")
 
 
-def shared_16x16_to_mma_32x8_layout(i, j):
-    thread_id = 4 * (i % 8) + (j % 8) // 2
-    return thread_id, 4 * (j // 8) + (i // 8) * 2 + (j % 2)
+def mma_store_index_map(*args, **kwargs):
+    return mma_store_32x8_to_shared_16x16_layout(*args, **kwargs)
 
 
-def shared_16x32_to_mma_32x16_layout(i, j):
-    thread_id = 4 * (i % 8) + (j % 16) // 4
-    return thread_id, 8 * (j // 16) + (i // 8) * 4 + j % 4
-
-
-def shared_32x16_to_mma_32x16_layout(i, j):
-    thread_id = (i % 16) // 4 + 4 * (j % 8)
-    return thread_id, 8 * (j // 8) + (i // 16) * 4 + i % 4
-
-
-def mma_store_index_map(thread_id, local_id):
-    return mma_store_32x8_to_shared_16x16_layout(thread_id, local_id)
-
-
-def mfma_store_index_map(thread_id, local_id):
-    return thread_id_shared_access_64x4_to_16x16_layout_C_n_m(thread_id, local_id)
+def mfma_store_index_map(*args, **kwargs):
+    return thread_id_shared_access_64x4_to_16x16_layout_C_n_m(*args, **kwargs)
 
 
 def get_mma_micro_size(dtype: Literal["float16", "int8"]):
