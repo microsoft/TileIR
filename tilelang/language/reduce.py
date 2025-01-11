@@ -4,9 +4,8 @@
 
 from tvm import tir
 
-def reduce(
-    buffer: tir.Buffer, out: tir.Buffer, reduce_type: str, dim: int, clear: bool
-):
+
+def reduce(buffer: tir.Buffer, out: tir.Buffer, reduce_type: str, dim: int, clear: bool):
     buffer = buffer.access_ptr("r")
     out = out.access_ptr("w")
     return tir.call_intrin(
@@ -20,9 +19,7 @@ def reduce(
     )
 
 
-def reduce_max(
-    buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True
-):
+def reduce_max(buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True):
     """Perform reduce max on input buffer, store the result to output buffer
 
     Parameters
@@ -42,9 +39,7 @@ def reduce_max(
     return reduce(buffer, out, "max", dim, clear)
 
 
-def reduce_min(
-    buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True
-):
+def reduce_min(buffer: tir.Buffer, out: tir.Buffer, dim: int, clear: bool = True):
     return reduce(buffer, out, "min", dim, clear)
 
 

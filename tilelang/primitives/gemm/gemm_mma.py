@@ -11,6 +11,7 @@ from tilelang.primitives.utils import is_fragment, array_reduce
 from tilelang.primitives.gemm.base import GemmBaseParams
 from tilelang.intrinsics.mma_macro_generator import TensorCoreIntrinEmitter
 
+
 # TODO(lei): Implement GEMM_SR, GEMM_RS, GEMM_RR
 @dataclass
 class GemmPrimitiveMMA(GemmBaseParams):
@@ -35,7 +36,7 @@ class GemmPrimitiveMMA(GemmBaseParams):
         B: tir.Buffer,
         C: tir.Buffer,
         mma_emitter: TensorCoreIntrinEmitter,
-    )-> tir.PrimExpr:
+    ) -> tir.PrimExpr:
 
         in_dtype = self.in_dtype
         warp_rows = mma_emitter.warp_rows
@@ -50,9 +51,7 @@ class GemmPrimitiveMMA(GemmBaseParams):
         c_is_fragment = is_fragment(C)
 
         @T.macro
-        def _gemm_rsr(
-            A_local: tir.Buffer, B_shared: tir.Buffer, C_local: tir.Buffer
-        ) -> None:
+        def _gemm_rsr(A_local: tir.Buffer, B_shared: tir.Buffer, C_local: tir.Buffer) -> None:
             """
             The inner macro that loads data from shared buffers A_shared and
             B_shared into local fragments, then issues Tensor Core mma ops,
@@ -63,18 +62,14 @@ class GemmPrimitiveMMA(GemmBaseParams):
             thread_bindings = T.thread_binding(0, threads, "threadIdx.x")
             if a_is_fragment:
                 # Annotate layout for A_local if it is a fragment.
-                T.annotate_layout(
-                    {
-                        A_local: mma_emitter.make_mma_load_layout(A_local, "A"),
-                    }
-                )
+                T.annotate_layout({
+                    A_local: mma_emitter.make_mma_load_layout(A_local, "A"),
+                })
             if c_is_fragment:
                 # Annotate layout for C_local if it is a fragment.
-                T.annotate_layout(
-                    {
-                        C_local: mma_emitter.make_mma_store_layout(C_local),
-                    }
-                )
+                T.annotate_layout({
+                    C_local: mma_emitter.make_mma_store_layout(C_local),
+                })
 
             for ki in T.serial(0, (block_K // micro_size_k)):
 
@@ -101,7 +96,7 @@ class GemmPrimitiveMMA(GemmBaseParams):
         B: tir.Buffer,
         C: tir.Buffer,
         mma_emitter: TensorCoreIntrinEmitter,
-    )-> tir.PrimExpr:
+    ) -> tir.PrimExpr:
         raise NotImplementedError("GEMM_RSR is not implemented yet")
 
     def gemm_ssr(
@@ -147,9 +142,7 @@ class GemmPrimitiveMMA(GemmBaseParams):
         c_is_fragment = is_fragment(C)
 
         @T.macro
-        def _gemm_ssr(
-            A_shared: tir.Buffer, B_shared: tir.Buffer, C_local: tir.Buffer
-        ) -> None:
+        def _gemm_ssr(A_shared: tir.Buffer, B_shared: tir.Buffer, C_local: tir.Buffer) -> None:
             """
             The inner macro that loads data from shared buffers A_shared and
             B_shared into local fragments, then issues Tensor Core mma ops,
@@ -162,13 +155,9 @@ class GemmPrimitiveMMA(GemmBaseParams):
 
             if c_is_fragment:
                 # Annotate layout for C_local if it is a fragment.
-                T.annotate_layout(
-                    {
-                        C_local: mma_emitter.make_mma_store_layout(
-                            C_local
-                        ),
-                    }
-                )
+                T.annotate_layout({
+                    C_local: mma_emitter.make_mma_store_layout(C_local),
+                })
 
             for ki in T.serial(0, (block_K // micro_size_k)):
                 # Load A into fragment

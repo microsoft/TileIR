@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 from tvm import tir
 
+
 class GemmWarpPolicy(IntEnum):
     """
     Enumeration for GEMM Warp Partitioning Policies.
@@ -89,16 +90,12 @@ class GemmWarpPolicy(IntEnum):
         if self.is_full_row():
             # FullRow policy: Allocate all warps to rows.
             m_warp = num_warps
-            assert (
-                M % num_warps == 0
-            ), "M must be divisible by num_warps for FullRow policy"
+            assert (M % num_warps == 0), "M must be divisible by num_warps for FullRow policy"
 
         elif self.is_full_col():
             # FullCol policy: Allocate all warps to columns.
             n_warp = num_warps
-            assert (
-                N % num_warps == 0
-            ), "N must be divisible by num_warps for FullCol policy"
+            assert (N % num_warps == 0), "N must be divisible by num_warps for FullCol policy"
 
         elif self.is_square():
             # Square policy: Try to balance warps across rows and columns.
@@ -136,7 +133,7 @@ class GemmBaseParams:
     A: tir.Buffer
     B: tir.Buffer
     C: tir.Buffer
-    
+
     transpose_A: bool = False
     transpose_B: bool = False
     block_row_warps: Optional[int] = None
@@ -148,7 +145,7 @@ class GemmBaseParams:
     k_pack: int = 1
 
     def get_warp_size(self) -> int:
-        # must rewrite to 64 if the target 
+        # must rewrite to 64 if the target
         # is cdna mfma
         return 32
 
@@ -167,7 +164,6 @@ class GemmBaseParams:
             "policy": self.policy,
             "k_pack": self.k_pack,
         }
-
 
     def infer_block_partition(self, threads: Optional[int]) -> None:
         """
@@ -210,19 +206,13 @@ class GemmBaseParams:
 
         # Determine whether block partition parameters need to be inferred
         require_infer = (
-            block_row_warps is None
-            or block_col_warps is None
-            or warp_row_tiles is None
-            or warp_col_tiles is None
-            or chunk is None
-        )
+            block_row_warps is None or block_col_warps is None or warp_row_tiles is None or
+            warp_col_tiles is None or chunk is None)
 
         A_shape, B_shape = A.shape, B.shape
 
         if require_infer:
-            assert (
-                threads is not None
-            ), "threads must be provided for auto inference"
+            assert (threads is not None), "threads must be provided for auto inference"
             # Auto-inference only supports 2D matrix multiplication
             assert (
                 len(A_shape) == 2 and len(B_shape) == 2
@@ -241,28 +231,24 @@ class GemmBaseParams:
 
             # Infer block partition using a user-specified policy
             block_row_warps, block_col_warps = policy.compute_warp_partition(
-                block_M, block_N, num_warps
-            )
+                block_M, block_N, num_warps)
             warp_row_tiles = block_M // block_row_warps
             warp_col_tiles = block_N // block_col_warps
             chunk = int(AK)
-        
+
         # rewrite the values
         self.block_row_warps = block_row_warps
         self.block_col_warps = block_col_warps
         self.warp_row_tiles = warp_row_tiles
         self.warp_col_tiles = warp_col_tiles
         self.chunk = chunk
-        
+
     @property
     def class_attributes(self):
         return self.params_as_dict()
 
-
     def __repr__(self) -> str:
         cls_name = self.__class__.__name__
         fields = self.class_attributes
-        field_str = ", ".join(
-            f"{key}={value!r}" for key, value in fields.items()
-        )
+        field_str = ", ".join(f"{key}={value!r}" for key, value in fields.items())
         return f"{cls_name}({field_str})"

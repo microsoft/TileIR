@@ -9,8 +9,7 @@ import tilelang as TL
 import tilelang.language as T
 from tilelang.intrinsics import get_swizzle_layout
 from tilelang.intrinsics.mma_macro_generator import (
-    TensorCoreIntrinEmitter,
-)
+    TensorCoreIntrinEmitter,)
 from tilelang.transform import simplify_prim_func
 
 torch.manual_seed(0)
@@ -179,6 +178,7 @@ def tl_matmul(
                 ]
 
     return main
+
 
 M, N, K = 128, 128, 128
 in_dtype, out_dtype, accum_dtype = "float16", "float16", "float16"

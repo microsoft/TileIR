@@ -4,6 +4,7 @@
 
 from tvm import tir
 
+
 class GemmWarpPolicy:
     Square = 0
     FullRow = 1

@@ -10,12 +10,8 @@ def atomic_add(dst, value):
 
 
 def atomic_addx2(dst, value):
-    return T.call_extern(
-        "handle", "atomicAddx2", T.address_of(dst), T.address_of(value)
-    )
+    return T.call_extern("handle", "atomicAddx2", T.address_of(dst), T.address_of(value))
 
 
 def dp4a(A, B, C):
-    return T.call_extern(
-        "handle", "DP4A", T.address_of(A), T.address_of(B), T.address_of(C)
-    )
+    return T.call_extern("handle", "DP4A", T.address_of(A), T.address_of(B), T.address_of(C))

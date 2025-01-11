@@ -6,6 +6,7 @@ import tilelang.testing
 import tilelang as tl
 from tilelang import primitives as P
 
+
 def matmul_ssr(
     M,
     N,
@@ -30,13 +31,11 @@ def matmul_ssr(
 
     @T.prim_func
     def main(
-        A: T.Buffer(A_shape, in_dtype),
-        B: T.Buffer(B_shape, in_dtype),
-        C: T.Buffer((M, N), out_dtype),
+            A: T.Buffer(A_shape, in_dtype),
+            B: T.Buffer(B_shape, in_dtype),
+            C: T.Buffer((M, N), out_dtype),
     ):
-        with T.Kernel(
-            T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=threads
-        ) as (bx, by):
+        with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=threads) as (bx, by):
             A_shared = T.alloc_shared(A_shared_shape, in_dtype)
             B_shared = T.alloc_shared(B_shared_shape, in_dtype)
             C_local = T.alloc_fragment((block_M, block_N), accum_dtype)
@@ -145,13 +144,11 @@ def matmul_rsr(
 
     @T.prim_func
     def main(
-        A: T.Buffer(A_shape, in_dtype),
-        B: T.Buffer(B_shape, in_dtype),
-        C: T.Buffer((M, N), out_dtype),
+            A: T.Buffer(A_shape, in_dtype),
+            B: T.Buffer(B_shape, in_dtype),
+            C: T.Buffer((M, N), out_dtype),
     ):
-        with T.Kernel(
-            T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=threads
-        ) as (bx, by):
+        with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=threads) as (bx, by):
             A_shared = T.alloc_shared(A_shared_shape, in_dtype)
             A_local = T.alloc_fragment(A_local_shape, in_dtype)
             B_shared = T.alloc_shared(B_shared_shape, in_dtype)
@@ -264,13 +261,11 @@ def matmul_rrr(
 
     @T.prim_func
     def main(
-        A: T.Buffer(A_shape, in_dtype),
-        B: T.Buffer(B_shape, in_dtype),
-        C: T.Buffer((M, N), out_dtype),
+            A: T.Buffer(A_shape, in_dtype),
+            B: T.Buffer(B_shape, in_dtype),
+            C: T.Buffer((M, N), out_dtype),
     ):
-        with T.Kernel(
-            T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=threads
-        ) as (bx, by):
+        with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=threads) as (bx, by):
             A_shared = T.alloc_shared(A_shared_shape, in_dtype)
             A_local = T.alloc_fragment(A_local_shape, in_dtype)
             B_shared = T.alloc_shared(B_shared_shape, in_dtype)

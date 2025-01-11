@@ -145,6 +145,7 @@ class KernelLaunchFrame(TIRFrame):
         """
         return self.get_num_threads()
 
+
 def Kernel(
     *blocks: List[tir.PrimExpr],
     threads: Union[int, List[int], Tuple] = 128,

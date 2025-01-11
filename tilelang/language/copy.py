@@ -6,11 +6,10 @@ from typing import Union, List, Optional
 from tvm import tir
 from tvm.script import tir as T
 
+
 def region(buffer: tir.BufferLoad, access_type: str, *args: tir.PrimExpr):
     access_type = {"r": 1, "w": 2, "rw": 3}[access_type]
-    return tir.call_intrin(
-        "handle", tir.op.Op.get("tl.region"), buffer, access_type, *args
-    )
+    return tir.call_intrin("handle", tir.op.Op.get("tl.region"), buffer, access_type, *args)
 
 
 def buffer_to_tile_region(buffer: tir.Buffer, access_type: str):
@@ -19,20 +18,14 @@ def buffer_to_tile_region(buffer: tir.Buffer, access_type: str):
     return region(T.BufferLoad(buffer, mins), access_type, *extents)
 
 
-def buffer_load_to_tile_region(
-    load: tir.BufferLoad, access_type: str, extents: List[tir.PrimExpr]
-):
+def buffer_load_to_tile_region(load: tir.BufferLoad, access_type: str, extents: List[tir.PrimExpr]):
     return region(load, access_type, *extents)
 
 
-def buffer_region_to_tile_region(
-    buffer_region: tir.BufferRegion, access_type: str
-):
+def buffer_region_to_tile_region(buffer_region: tir.BufferRegion, access_type: str):
     mins = [x.min for x in buffer_region.region]
     extents = [x.extent for x in buffer_region.region]
-    return region(
-        T.BufferLoad(buffer_region.buffer, mins), access_type, *extents
-    )
+    return region(T.BufferLoad(buffer_region.buffer, mins), access_type, *extents)
 
 
 def copy(
@@ -71,9 +64,7 @@ def copy(
     src = _to_region(src, "r")
     dst = _to_region(dst, "w")
     if coalesced_width is not None:
-        return tir.call_intrin(
-            "handle", tir.op.Op.get("tl.copy"), src, dst, coalesced_width
-        )
+        return tir.call_intrin("handle", tir.op.Op.get("tl.copy"), src, dst, coalesced_width)
     else:
         return tir.call_intrin("handle", tir.op.Op.get("tl.copy"), src, dst)
 

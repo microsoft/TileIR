@@ -37,6 +37,7 @@ def is_shared(buffer: Buffer, allow_dynamic: bool = True) -> bool:
         conditions.append(is_shared_dynamic(buffer))
     return any(conditions)
 
+
 def is_shared_dynamic(buffer: Buffer) -> bool:
     """
     Check if the buffer is in the dynamic shared memory scope.
@@ -74,6 +75,7 @@ def is_fragment(buffer: Buffer) -> bool:
         bool: True if the buffer is a fragment, False otherwise.
     """
     return buffer.scope().startswith("local.fragment")
+
 
 def array_reduce(array: List[int]) -> int:
     """

@@ -45,6 +45,4 @@ def Pipelined(
     if group is None:
         group = []
     # type: ignore[attr-defined] # pylint: disable=no-member
-    return _ffi_api.Pipelined(
-        start, stop, num_stages, order, stage, sync, group
-    )
+    return _ffi_api.Pipelined(start, stop, num_stages, order, stage, sync, group)

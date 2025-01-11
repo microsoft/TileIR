@@ -30,13 +30,11 @@ def matmul(
 
     @T.prim_func
     def main(
-        A: T.Buffer(A_shape, in_dtype),
-        B: T.Buffer(B_shape, in_dtype),
-        C: T.Buffer((M, N), out_dtype),
+            A: T.Buffer(A_shape, in_dtype),
+            B: T.Buffer(B_shape, in_dtype),
+            C: T.Buffer((M, N), out_dtype),
     ):
-        with T.Kernel(
-            T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=threads
-        ) as (bx, by):
+        with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=threads) as (bx, by):
             A_shared = T.alloc_shared(A_shared_shape, in_dtype)
             B_shared = T.alloc_shared(B_shared_shape, in_dtype)
             C_local = T.alloc_fragment((block_M, block_N), accum_dtype)
@@ -169,9 +167,7 @@ def test_gemm_f32f32f32_nn():
 
 
 def test_gemm_i8i8i32_nn():
-    run_gemm(
-        512, 1024, 768, False, False, "int8", "int8", "int32", 128, 128, 64
-    )
+    run_gemm(512, 1024, 768, False, False, "int8", "int8", "int32", 128, 128, 64)
 
 
 def test_gemm_f16f16f16_tn():
@@ -217,9 +213,7 @@ def test_gemm_i8i8i32_tn():
 
 
 def test_gemm_f64f64f64_nt():
-    run_gemm(
-        512, 512, 512, False, True, "float64", "float64", "float64", 64, 32, 16
-    )
+    run_gemm(512, 512, 512, False, True, "float64", "float64", "float64", 64, 32, 16)
 
 
 def test_gemm_f32f32f32_nt():

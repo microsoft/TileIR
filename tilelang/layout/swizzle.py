@@ -6,6 +6,7 @@
 import tvm
 from tilelang import _ffi_api
 
+
 def make_swizzled_layout(buffer: tvm.tir.Buffer):
     assert len(buffer.shape) == 2
     return _ffi_api.make_swizzled_layout(

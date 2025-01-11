@@ -4,6 +4,7 @@
 
 from tvm.script import tir as T
 
+
 def alloc_shared(shape, dtype, scope="shared.dyn"):
     return T.alloc_buffer(shape, dtype, scope=scope)
 

@@ -14,6 +14,7 @@ from .utils import (
 
 lift = convert
 
+
 # TODO(lei): Add Typing for this file
 class TensorCoreIntrinEmitter(object):
     """
@@ -75,9 +76,11 @@ class TensorCoreIntrinEmitter(object):
         self.reduce_k = reduce_k
         self.threads = self.WARP_SIZE * (block_row_warps * block_col_warps) * reduce_k
         self.num_elems_per_byte = num_elems_per_byte
-        
+
         if self.warp_rows == 0 or self.warp_cols == 0:
-            raise ValueError(f"Invalid threads configuration for this tile shape, {self.warp_rows} x {self.warp_cols} with threads {self.threads}")
+            raise ValueError(
+                f"Invalid threads configuration for this tile shape, {self.warp_rows} x {self.warp_cols} with threads {self.threads}"
+            )
 
     def _initialize_k_dim(self, a_dtype="float16"):
         if isinstance(a_dtype, str):
@@ -272,12 +275,9 @@ class TensorCoreIntrinEmitter(object):
                     A_local_buf.data,
                     k_inner * warp_rows * local_size_a + i * local_size_a,
                     B_local_buf.data,
-                    k_inner * warp_cols * local_size_b + j * local_size_b
-                    + lift(local_size_b) // 2,
+                    k_inner * warp_cols * local_size_b + j * local_size_b + lift(local_size_b) // 2,
                     C_local_buf.data,
-                    i * warp_cols * local_size_out
-                    + j * local_size_out
-                    + lift(local_size_out) // 2,
+                    i * warp_cols * local_size_out + j * local_size_out + lift(local_size_out) // 2,
                     T.bool(False),
                 )
 
@@ -328,7 +328,9 @@ class TensorCoreIntrinEmitter(object):
         return (_warp_stmatrix_global(C_local_buf, C_buf, thread_bindings)
                 if is_global else _warp_stmatrix_shared(C_local_buf, C_buf, thread_bindings))
 
-    def make_mma_load_layout(self, local_buf: Buffer, matrix:Literal["A", "B"]="A") -> T.Fragment:
+    def make_mma_load_layout(self,
+                             local_buf: Buffer,
+                             matrix: Literal["A", "B"] = "A") -> T.Fragment:
         """
         Create a layout function for storing MMA results into a fragment buffer.
         This layout is used in conjunction with `inverse_mma_store_layout` to
@@ -372,12 +374,14 @@ class TensorCoreIntrinEmitter(object):
             elif matrix == "A" and not transposed:
                 transform_func = ldmatrix_16x32_to_shared_16x32_layout_a
             else:
-                raise ValueError("ldmatrix only supports B transposed and A non-transposed for int8")
+                raise ValueError(
+                    "ldmatrix only supports B transposed and A non-transposed for int8")
         else:
             raise ValueError(f"Unsupported dtype {dtype}")
 
         shape = local_buf.shape
-        assert is_fragment(local_buf), "local_buf must be a fragment, but got {}".format(local_buf.scope())
+        assert is_fragment(local_buf), "local_buf must be a fragment, but got {}".format(
+            local_buf.scope())
 
         if matrix == "A":
             micro_size_x, micro_size_y = self.micro_size_x, self.micro_size_k
@@ -397,7 +401,8 @@ class TensorCoreIntrinEmitter(object):
         transform_func = transform_func if not transposed else transform_func_trans
         warp_size, local_size_a, local_size_b = self.WARP_SIZE, self.local_size_a, self.local_size_b
         local_size = local_size_a if matrix == "A" else local_size_b
-        inverse_mma_load_layout = IndexMap.from_func(transform_func, index_dtype="int32").inverse([warp_size, local_size])
+        inverse_mma_load_layout = IndexMap.from_func(
+            transform_func, index_dtype="int32").inverse([warp_size, local_size])
 
         def forward_thread(i: int, j: int) -> int:
             """
@@ -406,29 +411,19 @@ class TensorCoreIntrinEmitter(object):
             """
             # the upper bounds of i and j are block_row_warps * warp_rows * micro_size_x and block_col_warps * warp_cols * micro_size_y
             # the upper bounds of block_row_warps and block_col_warps are warp_rows and warp_cols
-            block_i, block_j = (i // micro_size_x) // warp_rows, (
-                j // micro_size_y
-            ) // warp_cols
+            block_i, block_j = (i // micro_size_x) // warp_rows, (j // micro_size_y) // warp_cols
             # the upper bounds of warp_i and warp_j are warp_rows and warp_cols
-            warp_i, warp_j = (i // micro_size_x) % warp_rows, (
-                j // micro_size_y
-            ) % warp_cols
+            warp_i, warp_j = (i // micro_size_x) % warp_rows, (j // micro_size_y) % warp_cols
             # upper bounds of mma_i and mma_j are micro_size_x and micro_size_y
             mma_i, mma_j = i % micro_size_x, j % micro_size_y
             lane_id, _ = inverse_mma_load_layout.map_indices([mma_i, mma_j])
             if is_m_first:
                 thread_id = (
-                    block_i * (block_col_warps * warp_cols)
-                    + block_j * warp_rows
-                    + warp_i * warp_cols
-                    + warp_j
-                )
+                    block_i * (block_col_warps * warp_cols) + block_j * warp_rows +
+                    warp_i * warp_cols + warp_j)
             else:
                 thread_id = (
-                    block_j * (block_row_warps * warp_size)
-                    + block_i * warp_size
-                    + lane_id
-                )
+                    block_j * (block_row_warps * warp_size) + block_i * warp_size + lane_id)
             return thread_id
 
         def forward_index(i: int, j: int) -> int:
@@ -439,21 +434,13 @@ class TensorCoreIntrinEmitter(object):
             """
             # the upper bounds of i and j are block_row_warps * warp_rows * micro_size_x and block_col_warps * warp_cols * micro_size_y
             # the upper bounds of block_row_warps and block_col_warps are warp_rows and warp_cols
-            block_i, block_j = (i // micro_size_x) // warp_rows, (
-                j // micro_size_y
-            ) // warp_cols
+            block_i, block_j = (i // micro_size_x) // warp_rows, (j // micro_size_y) // warp_cols
             # the upper bounds of warp_i and warp_j are warp_rows and warp_cols
-            warp_i, warp_j = (i // micro_size_x) % warp_rows, (
-                j // micro_size_y
-            ) % warp_cols
+            warp_i, warp_j = (i // micro_size_x) % warp_rows, (j // micro_size_y) % warp_cols
             # upper bounds of mma_i and mma_j are micro_size_x and micro_size_y
             mma_i, mma_j = i % micro_size_x, j % micro_size_y
             _, local_id = inverse_mma_load_layout.map_indices([mma_i, mma_j])
-            return (
-                warp_i * (warp_cols * local_size_out)
-                + warp_j * local_size_out
-                + local_id
-            )
+            return (warp_i * (warp_cols * local_size_out) + warp_j * local_size_out + local_id)
 
         fragment = T.Fragment(
             shape,
@@ -465,9 +452,7 @@ class TensorCoreIntrinEmitter(object):
         print(f"fragment.index: {fragment.index}")
         return fragment
 
-    def make_mma_store_layout(
-        self, local_buf: Buffer
-    ) -> T.Fragment:
+    def make_mma_store_layout(self, local_buf: Buffer) -> T.Fragment:
         """
         Create a layout function for storing MMA results into a fragment buffer.
         This layout is used in conjunction with `inverse_mma_store_layout` to
@@ -500,6 +485,7 @@ class TensorCoreIntrinEmitter(object):
         warp_rows, warp_cols = self.warp_rows, self.warp_cols
         warp_size = self.WARP_SIZE
         is_m_first = self.is_m_first
+
         def forward_thread(i: int, j: int) -> int:
             """
             Given the row index `i` and column index `j` in the fragment,
@@ -514,7 +500,8 @@ class TensorCoreIntrinEmitter(object):
             mma_i, mma_j = i % micro_size_x, j % micro_size_y
             lane_id, _ = inverse_mma_store_layout.map_indices([mma_i, mma_j])
             if is_m_first:
-                thread_id = block_i * (block_col_warps * warp_cols) + block_j * warp_rows + warp_i * warp_cols + warp_j
+                thread_id = block_i * (
+                    block_col_warps * warp_cols) + block_j * warp_rows + warp_i * warp_cols + warp_j
             else:
                 thread_id = block_j * (block_row_warps * warp_size) + block_i * warp_size + lane_id
             return thread_id
@@ -527,13 +514,9 @@ class TensorCoreIntrinEmitter(object):
             """
             # the upper bounds of i and j are block_row_warps * warp_rows * micro_size_x and block_col_warps * warp_cols * micro_size_y
             # the upper bounds of block_row_warps and block_col_warps are warp_rows and warp_cols
-            block_i, block_j = (i // micro_size_x) // warp_rows, (
-                j // micro_size_y
-            ) // warp_cols
+            block_i, block_j = (i // micro_size_x) // warp_rows, (j // micro_size_y) // warp_cols
             # the upper bounds of warp_i and warp_j are warp_rows and warp_cols
-            warp_i, warp_j = (i // micro_size_x) % warp_rows, (
-                j // micro_size_y
-            ) % warp_cols
+            warp_i, warp_j = (i // micro_size_x) % warp_rows, (j // micro_size_y) % warp_cols
             # upper bounds of mma_i and mma_j are micro_size_x and micro_size_y
             mma_i, mma_j = i % micro_size_x, j % micro_size_y
             _, local_id = inverse_mma_store_layout.map_indices([mma_i, mma_j])
@@ -544,6 +527,7 @@ class TensorCoreIntrinEmitter(object):
             forward_thread_fn=forward_thread,
             forward_index_fn=forward_index,
         )
+
 
 class TensorCoreIntrinEmitterWithLadderTransform(TensorCoreIntrinEmitter):
     """
