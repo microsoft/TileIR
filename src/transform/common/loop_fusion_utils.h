@@ -32,10 +32,10 @@
 
 #include <queue>
 
-#include "arith/ir_mutator_with_analyzer.h"
 #include "../../op/parallel.h"
 #include "../loop_partition.h"
 #include "../loop_vectorize.h"
+#include "arith/ir_mutator_with_analyzer.h"
 
 namespace tvm {
 namespace tl {
@@ -44,15 +44,15 @@ using namespace tir;
 using arith::IRMutatorWithAnalyzer;
 
 class FragmentAccessDetector : public StmtExprVisitor {
- public:
+public:
   FragmentAccessDetector() = default;
 
   void Collect(Stmt stmt) { VisitStmt(stmt); }
 
   bool HasFragmentAccess() { return has_fragment_access_; }
 
- private:
-  void VisitExpr_(const BufferLoadNode* op) final {
+private:
+  void VisitExpr_(const BufferLoadNode *op) final {
     // Check if the buffer is in global scope
     if (IsFragmentBuffer(op->buffer)) {
       has_fragment_access_ = true;
@@ -60,7 +60,7 @@ class FragmentAccessDetector : public StmtExprVisitor {
     StmtExprVisitor::VisitExpr_(op);
   }
 
-  void VisitStmt_(const BufferStoreNode* op) final {
+  void VisitStmt_(const BufferStoreNode *op) final {
     // Check if the buffer is in global scope
     if (IsFragmentBuffer(op->buffer)) {
       has_fragment_access_ = true;
@@ -69,8 +69,9 @@ class FragmentAccessDetector : public StmtExprVisitor {
   }
 
   // Helper function to determine if a buffer is local.fragment
-  bool IsFragmentBuffer(const Buffer& buffer) {
-    // The storage scope is often encoded in the buffer->data var name or associated attributes.
+  bool IsFragmentBuffer(const Buffer &buffer) {
+    // The storage scope is often encoded in the buffer->data var name or
+    // associated attributes.
     String scope = buffer.scope();
     return scope == "local.fragment";
   }
@@ -87,23 +88,25 @@ class FragmentAccessDetector : public StmtExprVisitor {
  * Once fused, a single loop variable will replace the chain, and the
  * original loop variables will be derived by division and modulo operations.
  *
- * This can be helpful for inferring layout for the fragment in a subsequent pass.
+ * This can be helpful for inferring layout for the fragment in a subsequent
+ * pass.
  */
 class ParallelLoopFuser : public IRMutatorWithAnalyzer {
- public:
+public:
   static Stmt Fuse(Stmt stmt) {
     arith::Analyzer analyzer;
     ParallelLoopFuser substituter(&analyzer);
     return substituter.VisitStmt(stmt);
   }
 
- private:
-  ParallelLoopFuser(arith::Analyzer* analyzer) : IRMutatorWithAnalyzer(analyzer) {};
+private:
+  ParallelLoopFuser(arith::Analyzer *analyzer)
+      : IRMutatorWithAnalyzer(analyzer){};
 
-  Stmt VisitStmt_(const ForNode* op) final {
+  Stmt VisitStmt_(const ForNode *op) final {
     // Gather consecutive parallel loops
-    std::vector<const ForNode*> loop_chain;
-    const ForNode* current = op;
+    std::vector<const ForNode *> loop_chain;
+    const ForNode *current = op;
     // check if has fragment access
     FragmentAccessDetector detector;
     detector.Collect(op->body);
@@ -113,11 +116,13 @@ class ParallelLoopFuser : public IRMutatorWithAnalyzer {
     }
 
     while (true) {
-      if (current->kind != ForKind::kParallel) break;
-      if (!is_zero(current->min)) break;
+      if (current->kind != ForKind::kParallel)
+        break;
+      if (!is_zero(current->min))
+        break;
       loop_chain.push_back(current);
 
-      const ForNode* inner_for = current->body.as<ForNode>();
+      const ForNode *inner_for = current->body.as<ForNode>();
       if (!inner_for) {
         break;
       }
@@ -147,7 +152,7 @@ class ParallelLoopFuser : public IRMutatorWithAnalyzer {
     Var fused_var(fused_name, DataType::Int(32));
 
     // The body of the last loop in the chain:
-    const ForNode* innermost_loop = loop_chain.back();
+    const ForNode *innermost_loop = loop_chain.back();
     Stmt body = innermost_loop->body;
 
     // We need to substitute all loop variables in the chain.
@@ -175,7 +180,8 @@ class ParallelLoopFuser : public IRMutatorWithAnalyzer {
       extents.push_back(l->extent);
     }
 
-    std::vector<PrimExpr> strides(loop_chain.size(), make_const(DataType::Int(32), 1));
+    std::vector<PrimExpr> strides(loop_chain.size(),
+                                  make_const(DataType::Int(32), 1));
     for (int i = static_cast<int>(loop_chain.size()) - 2; i >= 0; i--) {
       strides[i] = strides[i + 1] * extents[i + 1];
     }
@@ -189,8 +195,9 @@ class ParallelLoopFuser : public IRMutatorWithAnalyzer {
 
     Map<Var, PrimExpr> var_map;
     for (size_t i = 0; i < loop_chain.size(); i++) {
-      const ForNode* loop = loop_chain[i];
-      var_map.Set(loop->loop_var, analyzer_->Simplify(create_index_expr(static_cast<int>(i))));
+      const ForNode *loop = loop_chain[i];
+      var_map.Set(loop->loop_var,
+                  analyzer_->Simplify(create_index_expr(static_cast<int>(i))));
     }
 
     // Perform the substitution
@@ -203,5 +210,5 @@ class ParallelLoopFuser : public IRMutatorWithAnalyzer {
   }
 };
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

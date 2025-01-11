@@ -31,15 +31,17 @@ namespace tvm {
 namespace tir {
 
 class ClusterPlanner {
- public:
-  static PrimFunc Substitute(PrimFunc& f) {
+public:
+  static PrimFunc Substitute(PrimFunc &f) {
     // Step 1: Collect the read region of the function
     Map<Var, Buffer> buffer_data_to_buffer_;
-    for (const auto& [_, buffer] : f->buffer_map) {
+    for (const auto &[_, buffer] : f->buffer_map) {
       buffer_data_to_buffer_.Set(buffer->data, buffer);
     }
-    Block block(/*iter_vars=*/{}, /*reads=*/{}, /*writes=*/{}, /*name_hint=*/"", /*body*/ f->body);
-    Array<Array<BufferRegion>> access = GetBlockReadWriteRegion(block, buffer_data_to_buffer_);
+    Block block(/*iter_vars=*/{}, /*reads=*/{}, /*writes=*/{}, /*name_hint=*/"",
+                /*body*/ f->body);
+    Array<Array<BufferRegion>> access =
+        GetBlockReadWriteRegion(block, buffer_data_to_buffer_);
     auto reads = access[0];
 
     BlockIdxVisitor blockIdx_visitor;
@@ -47,20 +49,22 @@ class ClusterPlanner {
     auto dom_map = blockIdx_visitor.dom_map_;
 
     // Step 2: Collect mem reuse count for clustering on each dimension.
-    std::unordered_map<const IterVarNode*, size_t> mem_reuse_count;
-    for (auto iv : dom_map) mem_reuse_count[iv] = 0;
+    std::unordered_map<const IterVarNode *, size_t> mem_reuse_count;
+    for (auto iv : dom_map)
+      mem_reuse_count[iv] = 0;
 
-    for (const auto& buffer_region : reads) {
+    for (const auto &buffer_region : reads) {
       PrimExpr size = buffer_region->buffer->dtype.bits();
       RegionVisitor visitor;
-      for (const auto& range : buffer_region->region) {
+      for (const auto &range : buffer_region->region) {
         size = size * range->extent;
         visitor(range->min);
       }
       size = arith::Analyzer().Simplify(size);
       if (auto imm = size.as<IntImmNode>()) {
         for (auto iv : dom_map) {
-          if (visitor.seen_.count(iv->var.get()) == 0) mem_reuse_count[iv] += imm->value;
+          if (visitor.seen_.count(iv->var.get()) == 0)
+            mem_reuse_count[iv] += imm->value;
         }
       }
     }
@@ -70,7 +74,8 @@ class ClusterPlanner {
     String cluster_tag;
     for (auto iv : dom_map) {
       if (auto extent = iv->dom->extent.as<IntImmNode>()) {
-        if (extent->value % cluster_size_ == 0 && mem_reuse_count[iv] > mem_reuse_max) {
+        if (extent->value % cluster_size_ == 0 &&
+            mem_reuse_count[iv] > mem_reuse_max) {
           cluster_tag = iv->thread_tag;
           mem_reuse_max = mem_reuse_count[iv];
         }
@@ -78,27 +83,28 @@ class ClusterPlanner {
     }
 
     if (mem_reuse_max > 0) {
-      cluster_tag = "clusterIdx" + String(cluster_tag.c_str() + strlen("blockIdx"));
+      cluster_tag =
+          "clusterIdx" + String(cluster_tag.c_str() + strlen("blockIdx"));
       return WithAttr(f, cluster_tag, Integer(cluster_size_));
     } else {
       return f;
     }
   }
 
- private:
+private:
   ClusterPlanner() = default;
 
   class RegionVisitor : public ExprVisitor {
-   public:
+  public:
     RegionVisitor(){};
-    void VisitExpr_(const VarNode* var) { seen_.insert(var); }
-    std::unordered_set<const VarNode*> seen_;
+    void VisitExpr_(const VarNode *var) { seen_.insert(var); }
+    std::unordered_set<const VarNode *> seen_;
   };
 
   class BlockIdxVisitor : public StmtVisitor {
-   public:
+  public:
     BlockIdxVisitor(){};
-    void VisitStmt_(const AttrStmtNode* attr) final {
+    void VisitStmt_(const AttrStmtNode *attr) final {
       if (attr->attr_key == attr::thread_extent) {
         IterVar iv = Downcast<IterVar>(attr->node);
         String tag = iv->thread_tag;
@@ -108,7 +114,7 @@ class ClusterPlanner {
       StmtVisitor::VisitStmt_(attr);
     }
     /*! \brief The map from vars to blockidx extents. */
-    std::unordered_set<const IterVarNode*> dom_map_;
+    std::unordered_set<const IterVarNode *> dom_map_;
   };
 
   /*! \brief Currently set the plossible cluster size as 2 */
@@ -126,8 +132,9 @@ tvm::transform::Pass ClusterPlanning() {
   return CreatePrimFuncPass(pass_func, 0, "tl.ClusterPlanning", {});
 }
 
-TVM_REGISTER_GLOBAL("tl.transform.ClusterPlanning").set_body_typed(ClusterPlanning);
-}  // namespace transform
+TVM_REGISTER_GLOBAL("tl.transform.ClusterPlanning")
+    .set_body_typed(ClusterPlanning);
+} // namespace transform
 
-}  // namespace tir
-}  // namespace tvm
+} // namespace tir
+} // namespace tvm

@@ -23,12 +23,12 @@ bool TargetIsTuring(Target target);
 bool TargetIsAmpere(Target target);
 bool TargetIsHopper(Target target);
 bool TargetIsCDNA(Target target);
- 
+
 bool TargetHasAsyncCopy(Target target);
 bool TargetHasLdmatrix(Target target);
 bool TargetHasStmatrix(Target target);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm
 
-#endif  // TVM_TL_TARGET_UTILS_H_
+#endif // TVM_TL_TARGET_UTILS_H_

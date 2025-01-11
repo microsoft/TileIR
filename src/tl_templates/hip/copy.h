@@ -16,12 +16,13 @@ using index_t = u32;
 using ck_tile::int32x4_t;
 
 struct __attribute__((packed)) buffer_resource {
-  const void* ptr;
+  const void *ptr;
   uint32_t range;
   uint32_t config;
 };
 
-CK_TILE_DEVICE int32x4_t make_wave_buffer_resource(const void* ptr, uint32_t size = 0xffffffff) {
+CK_TILE_DEVICE int32x4_t make_wave_buffer_resource(const void *ptr,
+                                                   uint32_t size = 0xffffffff) {
   buffer_resource res{ptr, size, CK_TILE_BUFFER_RESOURCE_3RD_DWORD};
   int32x4_t r = __builtin_bit_cast(int32x4_t, res);
   r.x = __builtin_amdgcn_readfirstlane(r.x);
@@ -56,48 +57,56 @@ __device__ void async_gld_sld_fence(index_t cnt) {
 
 __device__ void wave_barrier() { asm volatile("s_barrier" : : : "memory"); }
 
-template <int N = 0>
-TL_DEVICE void cp_async_wait() {
+template <int N = 0> TL_DEVICE void cp_async_wait() {
   async_gld_fence(N);
   // or
   // async_gld_sld_fence(N);
 }
 
 template <bool pre_nop = false>
-CK_TILE_DEVICE void async_buffer_load_dword_v(void* smem, int32x4_t rsrc, index_t voffset) {
-  auto const lds_ptr_sgpr = __builtin_amdgcn_readfirstlane((reinterpret_cast<uintptr_t>(smem)));
-  asm volatile(
-      "s_mov_b32 m0, %0; \n\t"
-      "buffer_load_dword %1, %2, 0 offen lds;\n\t" ::"s"(lds_ptr_sgpr),
-      "v"(voffset), "s"(rsrc)
-      : "memory");
+CK_TILE_DEVICE void async_buffer_load_dword_v(void *smem, int32x4_t rsrc,
+                                              index_t voffset) {
+  auto const lds_ptr_sgpr =
+      __builtin_amdgcn_readfirstlane((reinterpret_cast<uintptr_t>(smem)));
+  asm volatile("s_mov_b32 m0, %0; \n\t"
+               "buffer_load_dword %1, %2, 0 offen lds;\n\t" ::"s"(lds_ptr_sgpr),
+               "v"(voffset), "s"(rsrc)
+               : "memory");
 }
 
 template <int N>
-TL_DEVICE void cp_async_gs(void* lds_base_ptr, void* global_base_ptr) {
-  if constexpr(N == 16) {
-    *(uint4*)lds_base_ptr = *(uint4*)global_base_ptr;
-  } else if constexpr(N == 8) {
-    *(uint2*)lds_base_ptr = *(uint2*)global_base_ptr;
-  } else if constexpr(N == 4) {
-    async_buffer_load_dword_v(lds_base_ptr, make_wave_buffer_resource(((int32_t *)global_base_ptr) - threadIdx.x), threadIdx.x * N /*assume 4 bytes*/);
+TL_DEVICE void cp_async_gs(void *lds_base_ptr, void *global_base_ptr) {
+  if constexpr (N == 16) {
+    *(uint4 *)lds_base_ptr = *(uint4 *)global_base_ptr;
+  } else if constexpr (N == 8) {
+    *(uint2 *)lds_base_ptr = *(uint2 *)global_base_ptr;
+  } else if constexpr (N == 4) {
+    async_buffer_load_dword_v(
+        lds_base_ptr,
+        make_wave_buffer_resource(((int32_t *)global_base_ptr) - threadIdx.x),
+        threadIdx.x * N /*assume 4 bytes*/);
   }
 }
 
-
 template <int N>
-TL_DEVICE void cp_async_gs_conditional(void* lds_base_ptr, void* global_base_ptr, bool cond) {
-  if constexpr(N == 16){
-    *(uint4*)lds_base_ptr = cond? *(uint4*)global_base_ptr: make_uint4(0,0,0,0);
-  }else if constexpr(N == 8){
-    *(uint2*)lds_base_ptr = cond? *(uint2*)global_base_ptr: make_uint2(0,0);
-  }else{
+TL_DEVICE void cp_async_gs_conditional(void *lds_base_ptr,
+                                       void *global_base_ptr, bool cond) {
+  if constexpr (N == 16) {
+    *(uint4 *)lds_base_ptr =
+        cond ? *(uint4 *)global_base_ptr : make_uint4(0, 0, 0, 0);
+  } else if constexpr (N == 8) {
+    *(uint2 *)lds_base_ptr =
+        cond ? *(uint2 *)global_base_ptr : make_uint2(0, 0);
+  } else {
     if (cond) {
-      async_buffer_load_dword_v(lds_base_ptr, make_wave_buffer_resource(((int32_t *)global_base_ptr) - threadIdx.x), threadIdx.x * N /*assume 4 bytes*/);
-    }else{
-      *(uint4*)lds_base_ptr = make_uint4(0,0,0,0);
+      async_buffer_load_dword_v(
+          lds_base_ptr,
+          make_wave_buffer_resource(((int32_t *)global_base_ptr) - threadIdx.x),
+          threadIdx.x * N /*assume 4 bytes*/);
+    } else {
+      *(uint4 *)lds_base_ptr = make_uint4(0, 0, 0, 0);
     }
   }
 }
 
-}  // namespace tl
+} // namespace tl

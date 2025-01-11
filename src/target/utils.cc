@@ -11,13 +11,17 @@
 namespace tvm {
 namespace tl {
 
-bool TargetIsCuda(Target target) { return target->GetTargetDeviceType() == kDLCUDA; }
-bool TargetIsRocm(Target target) { return target->GetTargetDeviceType() == kDLROCM; }
+bool TargetIsCuda(Target target) {
+  return target->GetTargetDeviceType() == kDLCUDA;
+}
+bool TargetIsRocm(Target target) {
+  return target->GetTargetDeviceType() == kDLROCM;
+}
 
 int GetArchInt(Target target) {
   auto s = target->GetAttr<String>("arch");
   ICHECK(s.defined());
-  const char* arch_str = s.value().c_str();
+  const char *arch_str = s.value().c_str();
   ICHECK_EQ(arch_str[0], 's');
   ICHECK_EQ(arch_str[1], 'm');
   ICHECK_EQ(arch_str[2], '_');
@@ -25,31 +29,36 @@ int GetArchInt(Target target) {
 }
 
 bool TargetIsVolta(Target target) {
-  if (!TargetIsCuda(target)) return false;
+  if (!TargetIsCuda(target))
+    return false;
   int arch = GetArchInt(target);
   return arch >= 70 && arch < 75;
 }
 
 bool TargetIsTuring(Target target) {
-  if (!TargetIsCuda(target)) return false;
+  if (!TargetIsCuda(target))
+    return false;
   int arch = GetArchInt(target);
   return arch >= 75 && arch < 80;
 }
 
 bool TargetIsAmpere(Target target) {
-  if (!TargetIsCuda(target)) return false;
+  if (!TargetIsCuda(target))
+    return false;
   int arch = GetArchInt(target);
   return arch >= 80 && arch < 90;
 }
 
 bool TargetIsHopper(Target target) {
-  if (!TargetIsCuda(target)) return false;
+  if (!TargetIsCuda(target))
+    return false;
   int arch = GetArchInt(target);
   return arch >= 90;
 }
 
 bool TargetIsCDNA(Target target) {
-  if (!TargetIsRocm(target)) return false;
+  if (!TargetIsRocm(target))
+    return false;
   if (target->attrs.count("mcpu")) {
     std::string mcpu = Downcast<String>(target->attrs.at("mcpu"));
     // if mcpu start with "gfx9", it is CDNA
@@ -78,16 +87,18 @@ bool TargetHasAsyncCopy(Target target) {
   return false;
 }
 bool TargetHasLdmatrix(Target target) {
-  if (!TargetIsCuda(target)) return false;
+  if (!TargetIsCuda(target))
+    return false;
   int arch = GetArchInt(target);
   return arch >= 75;
 }
 
 bool TargetHasStmatrix(Target target) {
-  if (!TargetIsCuda(target)) return false;
+  if (!TargetIsCuda(target))
+    return false;
   int arch = GetArchInt(target);
   return arch >= 90;
 }
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

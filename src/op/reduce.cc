@@ -41,57 +41,58 @@ ReduceOp::ReduceOp(Array<PrimExpr> args, BufferMap vmap) {
 
 PrimExpr ReduceOp::MakeInitValue() const {
   switch (type) {
-    case ReduceType::kSum:
-      return make_zero(dst->dtype);
-    case ReduceType::kAbsSum:
-      return make_zero(dst->dtype);
-    case ReduceType::kMax:
-      return make_const(dst->dtype, -INFINITY);
-    case ReduceType::kMin:
-      return make_const(dst->dtype, INFINITY);
-    default:
-      ICHECK(0);
+  case ReduceType::kSum:
+    return make_zero(dst->dtype);
+  case ReduceType::kAbsSum:
+    return make_zero(dst->dtype);
+  case ReduceType::kMax:
+    return make_const(dst->dtype, -INFINITY);
+  case ReduceType::kMin:
+    return make_const(dst->dtype, INFINITY);
+  default:
+    ICHECK(0);
   }
 }
 
-PrimExpr ReduceOp::MakeReduce(const PrimExpr& a, const PrimExpr& b) const {
+PrimExpr ReduceOp::MakeReduce(const PrimExpr &a, const PrimExpr &b) const {
   PrimExpr lhs = a, rhs = b;
   if (lhs->dtype != rhs->dtype) {
     rhs = Cast(lhs->dtype, rhs);
   }
   switch (type) {
-    case ReduceType::kSum:
-      return lhs + rhs;
-    case ReduceType::kAbsSum:
-      return lhs + Max(rhs, -rhs);
-    case ReduceType::kMax:
-      return Max(lhs, rhs);
-    case ReduceType::kMin:
-      return Min(lhs, rhs);
-    default:
-      ICHECK(0);
-      return PrimExpr(0);
+  case ReduceType::kSum:
+    return lhs + rhs;
+  case ReduceType::kAbsSum:
+    return lhs + Max(rhs, -rhs);
+  case ReduceType::kMax:
+    return Max(lhs, rhs);
+  case ReduceType::kMin:
+    return Min(lhs, rhs);
+  default:
+    ICHECK(0);
+    return PrimExpr(0);
   }
 }
 
 std::string ReduceOp::MakeCodegenReducer() const {
   switch (type) {
-    case ReduceType::kSum:
-      return "tl::SumOp";
-    case ReduceType::kAbsSum:
-      return "tl::SumOp";
-    case ReduceType::kMax:
-      return "tl::MaxOp";
-    case ReduceType::kMin:
-      return "tl::MinOp";
-    default:
-      ICHECK(0);
-      return "";
+  case ReduceType::kSum:
+    return "tl::SumOp";
+  case ReduceType::kAbsSum:
+    return "tl::SumOp";
+  case ReduceType::kMax:
+    return "tl::MaxOp";
+  case ReduceType::kMin:
+    return "tl::MinOp";
+  default:
+    ICHECK(0);
+    return "";
   }
 }
 
-Stmt ReduceOp::Lower(const LowerArgs& T, arith::Analyzer* analyzer) const {
-  ICHECK(this->src.scope() == "local.fragment" && this->dst.scope() == "local.fragment")
+Stmt ReduceOp::Lower(const LowerArgs &T, arith::Analyzer *analyzer) const {
+  ICHECK(this->src.scope() == "local.fragment" &&
+         this->dst.scope() == "local.fragment")
       << "Reduce for shared memory not implemented.";
   auto src_buffer = T.buffer_remap[this->src];
   auto dst_buffer = T.buffer_remap[this->dst];
@@ -101,20 +102,24 @@ Stmt ReduceOp::Lower(const LowerArgs& T, arith::Analyzer* analyzer) const {
   Array<IterVar> dst_vars;
   for (size_t i = 0; i < dst_layout->InputDim(); i++) {
     Var var = Var(std::string{char('i' + i)});
-    dst_vars.push_back(IterVar(Range(0, dst_layout->InputShape()[i]), var, IterVarType::kDataPar));
+    dst_vars.push_back(IterVar(Range(0, dst_layout->InputShape()[i]), var,
+                               IterVarType::kDataPar));
   }
   Array<IterVar> src_vars = dst_vars;
-  src_vars.insert(src_vars.begin() + this->dim, {Range(0, src_layout->InputShape()[this->dim]),
-                                                 Var("rv"), IterVarType::kDataPar});
-  Array<PrimExpr> src_indices =
-      src_layout->Forward(src_vars.Map([](const auto& iv) { return PrimExpr(iv->var); }));
-  Array<PrimExpr> dst_indices =
-      dst_layout->Forward(dst_vars.Map([](const auto& iv) { return PrimExpr(iv->var); }));
+  src_vars.insert(src_vars.begin() + this->dim,
+                  {Range(0, src_layout->InputShape()[this->dim]), Var("rv"),
+                   IterVarType::kDataPar});
+  Array<PrimExpr> src_indices = src_layout->Forward(
+      src_vars.Map([](const auto &iv) { return PrimExpr(iv->var); }));
+  Array<PrimExpr> dst_indices = dst_layout->Forward(
+      dst_vars.Map([](const auto &iv) { return PrimExpr(iv->var); }));
 
   Array<Stmt> stmts;
 
   // make reduce-init stmt
-  if (this->clear) stmts.push_back(BufferStore(dst_buffer, this->MakeInitValue(), dst_indices));
+  if (this->clear)
+    stmts.push_back(
+        BufferStore(dst_buffer, this->MakeInitValue(), dst_indices));
 
   // make thread-local reduce
   Array<PrimExpr> src_indice_compressed;
@@ -122,45 +127,50 @@ Stmt ReduceOp::Lower(const LowerArgs& T, arith::Analyzer* analyzer) const {
   for (size_t i = 0; i < src_layout->OutputDim(); i++) {
     PrimExpr expr;
     IterVar var;
-    std::tie(expr, var) =
-        CompressIterator(src_indices[i], src_vars, src_vars[this->dim]->var, analyzer);
+    std::tie(expr, var) = CompressIterator(src_indices[i], src_vars,
+                                           src_vars[this->dim]->var, analyzer);
     src_indice_compressed.push_back(expr);
     src_var_compressed.push_back(var);
   }
-  Stmt reduce_local = BufferStore(dst_buffer,
-                                  this->MakeReduce(BufferLoad(dst_buffer, dst_indices),
-                                                   BufferLoad(src_buffer, src_indice_compressed)),
-                                  dst_indices);
+  Stmt reduce_local = BufferStore(
+      dst_buffer,
+      this->MakeReduce(BufferLoad(dst_buffer, dst_indices),
+                       BufferLoad(src_buffer, src_indice_compressed)),
+      dst_indices);
   for (int i = src_layout->OutputDim() - 1; i >= 0; i--) {
     reduce_local =
-        For(src_var_compressed[i]->var, 0, src_var_compressed[i]->dom->extent, ForKind::kUnrolled,
-            reduce_local, NullOpt, {{tir::attr::pragma_unroll_explicit, Bool(false)}});
+        For(src_var_compressed[i]->var, 0, src_var_compressed[i]->dom->extent,
+            ForKind::kUnrolled, reduce_local, NullOpt,
+            {{tir::attr::pragma_unroll_explicit, Bool(false)}});
   }
   stmts.push_back(reduce_local);
 
   // make inter-thread reduce
-  PrimExpr src_thread =
-      src_layout->ForwardThread(src_vars.Map([](const auto& iv) { return PrimExpr(iv->var); }), {});
-  auto iter_sum = arith::NormalizeToIterSum(src_thread, ToVMap(src_vars), analyzer);
-  for (const auto& iter_split : iter_sum->args) {
+  PrimExpr src_thread = src_layout->ForwardThread(
+      src_vars.Map([](const auto &iv) { return PrimExpr(iv->var); }), {});
+  auto iter_sum =
+      arith::NormalizeToIterSum(src_thread, ToVMap(src_vars), analyzer);
+  for (const auto &iter_split : iter_sum->args) {
     auto mark = iter_split->source->source.as<Var>();
     ICHECK(mark.defined());
     if (mark.value().same_as(src_vars[this->dim]->var)) {
       auto scale = as_const_int(iter_split->scale);
       auto extent = as_const_int(iter_split->extent);
       ICHECK(scale != nullptr && extent != nullptr);
-      if (*extent == 1) continue;
+      if (*extent == 1)
+        continue;
       int reducing_threads = (*extent) * (*scale);
       std::stringstream ss;
-      ss << "tl::AllReduce<" << this->MakeCodegenReducer() << ", " << reducing_threads << ", "
-         << (*scale) << ">::run";
-      Array<PrimExpr> thread_reduce_args = {StringImm(ss.str()),
-                                            BufferLoad(dst_buffer, dst_indices)};
+      ss << "tl::AllReduce<" << this->MakeCodegenReducer() << ", "
+         << reducing_threads << ", " << (*scale) << ">::run";
+      Array<PrimExpr> thread_reduce_args = {
+          StringImm(ss.str()), BufferLoad(dst_buffer, dst_indices)};
       if (reducing_threads >= 32) {
         PrimExpr workspace = T.AddWorkspace(T.block_size, dst_buffer->dtype);
         thread_reduce_args.push_back(workspace);
       }
-      auto call = Call(dst_buffer->dtype, builtin::call_extern(), thread_reduce_args);
+      auto call =
+          Call(dst_buffer->dtype, builtin::call_extern(), thread_reduce_args);
       stmts.push_back(BufferStore(dst_buffer, call, dst_indices));
     }
   }
@@ -170,15 +180,17 @@ Stmt ReduceOp::Lower(const LowerArgs& T, arith::Analyzer* analyzer) const {
   // make the outer spatial loop
   Stmt body = stmts.size() > 1 ? SeqStmt(stmts) : stmts[0];
   for (int i = dst_layout->InputDim() - 1; i >= 0; i--) {
-    body = For(dst_vars[i]->var, 0, dst_vars[i]->dom->extent, ForKind::kParallel, body);
+    body = For(dst_vars[i]->var, 0, dst_vars[i]->dom->extent,
+               ForKind::kParallel, body);
   }
 
   body = PartitionLoop(Downcast<For>(body), T.thread_var, analyzer, dst_layout);
   return body;
 }
 
-LayoutMap ReduceOp::InferLayout(const LayoutInferArgs& T, InferLevel level) {
-  if (level >= InferLevel::kStrict) return {};
+LayoutMap ReduceOp::InferLayout(const LayoutInferArgs &T, InferLevel level) {
+  if (level >= InferLevel::kStrict)
+    return {};
   if (src.scope() == "local.fragment" && dst.scope() == "local.fragment" &&
       T.layout_map.count(src) && !T.layout_map.count(dst)) {
     auto src_layout = T.layout_map[src].as<Fragment>().value();
@@ -197,10 +209,11 @@ LayoutMap ReduceOp::InferLayout(const LayoutInferArgs& T, InferLevel level) {
         fwd.push_back(InputPlaceholder(i - 1));
       }
     }
-    auto thd =
-        src_layout->ForwardThread(fwd, FloorDiv(ReplicationPlaceholder(), indice_rep_extent));
+    auto thd = src_layout->ForwardThread(
+        fwd, FloorDiv(ReplicationPlaceholder(), indice_rep_extent));
     Fragment dst_layout =
-        Fragment(dst->shape, {}, thd, dest_buffer_rep_extent, NullOpt)->CondenseReplicateVar();
+        Fragment(dst->shape, {}, thd, dest_buffer_rep_extent, NullOpt)
+            ->CondenseReplicateVar();
     return {{dst, dst_layout}};
   }
   return {};
@@ -208,7 +221,8 @@ LayoutMap ReduceOp::InferLayout(const LayoutInferArgs& T, InferLevel level) {
 
 TIR_REGISTER_TL_OP(ReduceOp, reduce)
     .set_num_inputs(4)
-    .set_attr<TCallEffectKind>("TCallEffectKind", Integer(CallEffectKind::kOpaque));
+    .set_attr<TCallEffectKind>("TCallEffectKind",
+                               Integer(CallEffectKind::kOpaque));
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

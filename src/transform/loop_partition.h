@@ -36,13 +36,14 @@ namespace tl {
 
 using namespace tir;
 
-For PartitionLoop(For op, Var thread_var, arith::Analyzer* analyzer, Fragment loop_layout);
+For PartitionLoop(For op, Var thread_var, arith::Analyzer *analyzer,
+                  Fragment loop_layout);
 
 Fragment PlanLoopPartition(For op, size_t num_thread, int vectorize_size);
 
 For LoopPragmaUnroll(For stmt);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm
 
-#endif  // TVM_TL_LOOP_PARTITION_H_
+#endif // TVM_TL_LOOP_PARTITION_H_

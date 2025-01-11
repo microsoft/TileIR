@@ -2,10 +2,10 @@
 // Licensed under the MIT License.
 #pragma once
 
-#include <hip/hip_runtime.h>
-#include <hip/hip_fp16.h>
-#include <rocwmma/rocwmma.hpp>
 #include <ck_tile/core.hpp>
+#include <hip/hip_fp16.h>
+#include <hip/hip_runtime.h>
+#include <rocwmma/rocwmma.hpp>
 
 using ck_tile::half_t;
 
@@ -36,12 +36,16 @@ using ck_tile::half_t;
 
 using float16_t = _Float16;
 
-using float16x2 = __attribute__((__vector_size__(2 * sizeof(float16_t)))) float16_t;
-using float16x4 = __attribute__((__vector_size__(4 * sizeof(float16_t)))) float16_t;
-using float16x8 = __attribute__((__vector_size__(8 * sizeof(float16_t)))) float16_t;
-using float16x16 = __attribute__((__vector_size__(16 * sizeof(float16_t)))) float16_t;
+using float16x2 =
+    __attribute__((__vector_size__(2 * sizeof(float16_t)))) float16_t;
+using float16x4 =
+    __attribute__((__vector_size__(4 * sizeof(float16_t)))) float16_t;
+using float16x8 =
+    __attribute__((__vector_size__(8 * sizeof(float16_t)))) float16_t;
+using float16x16 =
+    __attribute__((__vector_size__(16 * sizeof(float16_t)))) float16_t;
 
-using int32x4  = __attribute__((__vector_size__(4 * sizeof(int)))) int;
+using int32x4 = __attribute__((__vector_size__(4 * sizeof(int)))) int;
 using float32x4 = __attribute__((__vector_size__(4 * sizeof(float)))) float;
 using float32x16 = __attribute__((__vector_size__(16 * sizeof(float)))) float;
 
@@ -49,7 +53,7 @@ using int8x4 = __attribute__((__vector_size__(4 * sizeof(int8_t)))) int8_t;
 
 // Pack two half_t values.
 TL_DEVICE unsigned __pack_half2(const half_t x, const half_t y) {
-  unsigned v0 = *((unsigned short*)&x);
-  unsigned v1 = *((unsigned short*)&y);
+  unsigned v0 = *((unsigned short *)&x);
+  unsigned v1 = *((unsigned short *)&y);
   return (v1 << 16) | v0;
 }

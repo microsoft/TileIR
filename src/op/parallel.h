@@ -23,30 +23,30 @@ using namespace tir;
 class ParallelOp;
 
 class ParallelLoopNestVisitor : public StmtExprVisitor {
- private:
-  ParallelLoopNestVisitor(ParallelOp* op) : p(op){};
-  void VisitStmt_(const ForNode* op) final;
-  void VisitStmt_(const BufferStoreNode* op) final;
-  void VisitExpr_(const BufferLoadNode* op) final;
+private:
+  ParallelLoopNestVisitor(ParallelOp *op) : p(op){};
+  void VisitStmt_(const ForNode *op) final;
+  void VisitStmt_(const BufferStoreNode *op) final;
+  void VisitExpr_(const BufferLoadNode *op) final;
 
-  ParallelOp* p;
+  ParallelOp *p;
 
   friend class ParallelOp;
 };
 
 class ParallelOp : public Operator {
- public:
+public:
   ParallelOp(For root);
-  LayoutMap InferLayout(const LayoutInferArgs& T, InferLevel level) final;
+  LayoutMap InferLayout(const LayoutInferArgs &T, InferLevel level) final;
 
   Fragment GetLoopLayout() const { return loop_layout_; }
   For GetRoot() const { return root_; }
   Map<Buffer, Array<PrimExpr>> GetIndiceMap() const { return indice_map_; }
   Optional<PrimExpr> GetPredicate(Var thread_var) const;
 
- private:
-  Fragment CompleteBufferFragment(const Buffer& buffer);
-  bool IsCommonAccessIndice(const Buffer& buffer) const;
+private:
+  Fragment CompleteBufferFragment(const Buffer &buffer);
+  bool IsCommonAccessIndice(const Buffer &buffer) const;
   void AddPredicate(PrimExpr expr) {
     predicate_ = predicate_.defined() ? And(expr, predicate_.value()) : expr;
   }
@@ -66,7 +66,7 @@ class ParallelOp : public Operator {
   friend class ParallelLoopNestVisitor;
 };
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm
 
-#endif  // TVM_TL_OP_PARALLEL_H_
+#endif // TVM_TL_OP_PARALLEL_H_

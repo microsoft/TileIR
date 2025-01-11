@@ -1,17 +1,19 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-#include "runtime/cuda/cuda_module.h"
 #include "codegen_cuda.h"
+#include "runtime/cuda/cuda_module.h"
 
 namespace tvm {
 namespace codegen {
 
-static std::unordered_map<std::string, runtime::FunctionInfo> ExtractFuncInfo(const IRModule& mod) {
+static std::unordered_map<std::string, runtime::FunctionInfo>
+ExtractFuncInfo(const IRModule &mod) {
   std::unordered_map<std::string, runtime::FunctionInfo> fmap;
 
   for (auto kv : mod->functions) {
-    ICHECK(kv.second->IsInstance<tir::PrimFuncNode>()) << "Can only lower IR Module with PrimFuncs";
+    ICHECK(kv.second->IsInstance<tir::PrimFuncNode>())
+        << "Can only lower IR Module with PrimFuncs";
     auto f = Downcast<tir::PrimFunc>(kv.second);
 
     runtime::FunctionInfo info;
@@ -26,7 +28,7 @@ static std::unordered_map<std::string, runtime::FunctionInfo> ExtractFuncInfo(co
       info.arg_types.push_back(f->params[i].dtype());
     }
     if (auto opt = f->GetAttr<Array<String>>(tir::attr::kKernelLaunchParams)) {
-      for (const auto& tag : opt.value()) {
+      for (const auto &tag : opt.value()) {
         info.launch_param_tags.push_back(tag);
       }
     }
@@ -43,7 +45,8 @@ runtime::Module BuildTileLangCUDA(IRModule mod, Target target) {
   cg.Init(output_ssa);
 
   for (auto kv : mod->functions) {
-    ICHECK(kv.second->IsInstance<PrimFuncNode>()) << "CodeGenTileLangCUDA: Can only take PrimFunc";
+    ICHECK(kv.second->IsInstance<PrimFuncNode>())
+        << "CodeGenTileLangCUDA: Can only take PrimFunc";
     auto f = Downcast<PrimFunc>(kv.second);
     auto calling_conv = f->GetAttr<Integer>(tvm::attr::kCallingConv);
     ICHECK(calling_conv == CallingConv::kDeviceKernelLaunch);
@@ -51,14 +54,15 @@ runtime::Module BuildTileLangCUDA(IRModule mod, Target target) {
   }
 
   std::string code = cg.Finish();
-  if (const auto* f = Registry::Get("tvm_callback_cuda_postproc")) {
+  if (const auto *f = Registry::Get("tvm_callback_cuda_postproc")) {
     code = (*f)(code, target).operator std::string();
   }
   std::string fmt = "ptx";
   std::string ptx;
-  if (const auto* f = Registry::Get("tvm_callback_cuda_compile")) {
+  if (const auto *f = Registry::Get("tvm_callback_cuda_compile")) {
     ptx = (*f)(code, target).operator std::string();
-    if (ptx[0] != '/') fmt = "cubin";
+    if (ptx[0] != '/')
+      fmt = "cubin";
   } else {
     ICHECK(0);
   }
@@ -72,7 +76,8 @@ String BuildTLDebug(IRModule mod, Target target) {
   cg.Init(output_ssa);
 
   for (auto kv : mod->functions) {
-    ICHECK(kv.second->IsInstance<PrimFuncNode>()) << "CodeGenTileLangCUDA: Can only take PrimFunc";
+    ICHECK(kv.second->IsInstance<PrimFuncNode>())
+        << "CodeGenTileLangCUDA: Can only take PrimFunc";
     auto f = Downcast<PrimFunc>(kv.second);
     auto calling_conv = f->GetAttr<Integer>(tvm::attr::kCallingConv);
     ICHECK(calling_conv == CallingConv::kDeviceKernelLaunch);
@@ -80,14 +85,16 @@ String BuildTLDebug(IRModule mod, Target target) {
   }
 
   std::string code = cg.Finish();
-  if (const auto* f = Registry::Get("tvm_callback_cuda_postproc")) {
+  if (const auto *f = Registry::Get("tvm_callback_cuda_postproc")) {
     code = (*f)(code, target).operator std::string();
   }
   return String(code);
 }
 
-TVM_REGISTER_GLOBAL("target.build.tilelang_cuda").set_body_typed(BuildTileLangCUDA);
-TVM_REGISTER_GLOBAL("target.build.tl_debug_codegen").set_body_typed(BuildTLDebug);
+TVM_REGISTER_GLOBAL("target.build.tilelang_cuda")
+    .set_body_typed(BuildTileLangCUDA);
+TVM_REGISTER_GLOBAL("target.build.tl_debug_codegen")
+    .set_body_typed(BuildTLDebug);
 
-}  // namespace codegen
-}  // namespace tvm
+} // namespace codegen
+} // namespace tvm

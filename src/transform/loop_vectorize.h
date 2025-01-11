@@ -35,13 +35,13 @@ namespace tl {
 
 using namespace tir;
 
-int GetVectorizeSize(const For& loop);
-For VectorizeLoop(const For& loop, int vectorize_hint = -1);
+int GetVectorizeSize(const For &loop);
+For VectorizeLoop(const For &loop, int vectorize_hint = -1);
 
-bool IndiceCanVectorize(PrimExpr expr, Var var, PrimExpr iter_var_size, int target_vectorized_size,
-                        arith::Analyzer* analyzer);
+bool IndiceCanVectorize(PrimExpr expr, Var var, PrimExpr iter_var_size,
+                        int target_vectorized_size, arith::Analyzer *analyzer);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm
 
-#endif  // TVM_TL_LOOP_VECTORIZE_H_
+#endif // TVM_TL_LOOP_VECTORIZE_H_

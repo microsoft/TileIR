@@ -30,8 +30,8 @@
 
 #include <queue>
 
-#include "arith/ir_mutator_with_analyzer.h"
 #include "../op/parallel.h"
+#include "arith/ir_mutator_with_analyzer.h"
 #include "loop_partition.h"
 #include "loop_vectorize.h"
 
@@ -43,11 +43,11 @@ using arith::IRMutatorWithAnalyzer;
 
 // Helper class to find leaf For nodes in a given IR
 class LeafForFinder : public StmtVisitor {
- public:
+public:
   std::vector<For> leaf_for_nodes;
 
- private:
-  void VisitStmt_(const ForNode* op) final {
+private:
+  void VisitStmt_(const ForNode *op) final {
     has_child_for_ = false;
     bool parent_has_child_for = parent_has_child_for_;
     parent_has_child_for_ = false;
@@ -62,7 +62,7 @@ class LeafForFinder : public StmtVisitor {
     parent_has_child_for_ = true;
   }
 
- private:
+private:
   bool has_child_for_ = false;
   bool parent_has_child_for_ = false;
 };
@@ -75,11 +75,11 @@ class LeafForFinder : public StmtVisitor {
 //    If the index might exceed the shape (upper bound too large),
 //    log a warning or handle accordingly.
 struct GlobalMemChecker : public StmtExprVisitor {
-  arith::Analyzer* analyzer;
+  arith::Analyzer *analyzer;
 
-  explicit GlobalMemChecker(arith::Analyzer* analyzer) : analyzer(analyzer) {}
+  explicit GlobalMemChecker(arith::Analyzer *analyzer) : analyzer(analyzer) {}
 
-  void VisitExpr_(const BufferLoadNode* op) final {
+  void VisitExpr_(const BufferLoadNode *op) final {
     // Check if the buffer is in global scope
     if (IsGlobalBuffer(op->buffer)) {
       CheckBufferIndices(op->buffer, op->indices, /*is_load=*/true);
@@ -87,7 +87,7 @@ struct GlobalMemChecker : public StmtExprVisitor {
     StmtExprVisitor::VisitExpr_(op);
   }
 
-  void VisitStmt_(const BufferStoreNode* op) final {
+  void VisitStmt_(const BufferStoreNode *op) final {
     // Check if the buffer is in global scope
     if (IsGlobalBuffer(op->buffer)) {
       CheckBufferIndices(op->buffer, op->indices, /*is_load=*/false);
@@ -96,21 +96,24 @@ struct GlobalMemChecker : public StmtExprVisitor {
   }
 
   // Helper function to determine if a buffer is global
-  bool IsGlobalBuffer(const Buffer& buffer) {
-    // The storage scope is often encoded in the buffer->data var name or associated attributes.
-    // In typical TVM IR, global buffers have scope "global".
-    // Here we assume a helper function GetPtrStorageScope is available.
-    // If not, you might need to parse buffer->data->name_hint or associated attributes.
+  bool IsGlobalBuffer(const Buffer &buffer) {
+    // The storage scope is often encoded in the buffer->data var name or
+    // associated attributes. In typical TVM IR, global buffers have scope
+    // "global". Here we assume a helper function GetPtrStorageScope is
+    // available. If not, you might need to parse buffer->data->name_hint or
+    // associated attributes.
     String scope = buffer.scope();
     return scope == "global";
   }
 
   // Check each index against the buffer shape dimensions
-  void CheckBufferIndices(const Buffer& buffer, const Array<PrimExpr>& indices, bool is_load) {
+  void CheckBufferIndices(const Buffer &buffer, const Array<PrimExpr> &indices,
+                          bool is_load) {
     // Ensure indices count matches buffer dimension
     if (indices.size() != buffer->shape.size()) {
-      LOG(WARNING) << "Buffer access dimension mismatch: indices size (" << indices.size()
-                   << ") vs. shape size (" << buffer->shape.size() << ")";
+      LOG(WARNING) << "Buffer access dimension mismatch: indices size ("
+                   << indices.size() << ") vs. shape size ("
+                   << buffer->shape.size() << ")";
       return;
     }
 
@@ -130,18 +133,19 @@ struct GlobalMemChecker : public StmtExprVisitor {
 
   Array<PrimExpr> GetConditions() { return _conditions; }
 
- private:
+private:
   Array<PrimExpr> _conditions;
 };
 
 class SafeMemorysRewriter : public StmtExprMutator {
-  arith::Analyzer* analyzer_;
+  arith::Analyzer *analyzer_;
 
- public:
-  explicit SafeMemorysRewriter(arith::Analyzer* analyzer) : analyzer_(analyzer) {}
+public:
+  explicit SafeMemorysRewriter(arith::Analyzer *analyzer)
+      : analyzer_(analyzer) {}
 
- private:
-  Stmt VisitStmt_(const BufferStoreNode* op) final {
+private:
+  Stmt VisitStmt_(const BufferStoreNode *op) final {
     // Check if the buffer is in global scope
     auto store = Downcast<BufferStore>(StmtExprMutator::VisitStmt_(op));
     GlobalMemChecker checker(analyzer_);
@@ -173,12 +177,13 @@ class SafeMemorysRewriter : public StmtExprMutator {
 
   // Handle Call Nodes
   // For example
-  // T.call_extern("handle", "atomicAddx2", T.address_of(C), T.address_of(C_shared))
-  Stmt VisitStmt_(const EvaluateNode* op) final {
+  // T.call_extern("handle", "atomicAddx2", T.address_of(C),
+  // T.address_of(C_shared))
+  Stmt VisitStmt_(const EvaluateNode *op) final {
     auto evaluate = Downcast<Evaluate>(StmtExprMutator::VisitStmt_(op));
     auto call = Downcast<Call>(evaluate->value);
     if (call.defined() && call->op == builtin::call_extern()) {
-      
+
       GlobalMemChecker checker(analyzer_);
       checker(call);
       Array<PrimExpr> conditions = checker.GetConditions();
@@ -197,13 +202,12 @@ class SafeMemorysRewriter : public StmtExprMutator {
     return evaluate;
   }
 
-
-  bool isSharedBuffer(const Buffer& buffer) {
+  bool isSharedBuffer(const Buffer &buffer) {
     String scope = buffer.scope();
     return scope == "shared" || scope == "shared.dyn";
   }
 
-  bool IsGlobalBuffer(const Buffer& buffer) {
+  bool IsGlobalBuffer(const Buffer &buffer) {
     String scope = buffer.scope();
     return scope == "global";
   }
@@ -211,32 +215,34 @@ class SafeMemorysRewriter : public StmtExprMutator {
 
 // Class to legalize safe memory access by transforming them appropriately
 class SafeMemoryLegalizer : IRMutatorWithAnalyzer {
- public:
+public:
   // Static method to substitute and transform the given PrimFunc
   static PrimFunc Substitute(PrimFunc f) {
     arith::Analyzer analyzer;
     // Create an instance of the legalizer with the analyzer
     SafeMemoryLegalizer substituter(&analyzer);
     // Get a mutable copy of the function node
-    PrimFuncNode* fptr = f.CopyOnWrite();
+    PrimFuncNode *fptr = f.CopyOnWrite();
     // Apply the legalizer to the function body
     fptr->body = substituter.VisitStmt(f->body);
     return f;
   }
 
- private:
+private:
   // Constructor initializing the base class with the analyzer
-  SafeMemoryLegalizer(arith::Analyzer* analyzer) : arith::IRMutatorWithAnalyzer(analyzer) {}
+  SafeMemoryLegalizer(arith::Analyzer *analyzer)
+      : arith::IRMutatorWithAnalyzer(analyzer) {}
 
   // Override the VisitStmt_ method to handle ForNode (loop statements)
-  Stmt VisitStmt_(const ForNode* op) final {
+  Stmt VisitStmt_(const ForNode *op) final {
     // Visit and potentially modify the loop node
     For for_node = Downcast<For>(IRMutatorWithAnalyzer::VisitStmt_(op));
     auto has_inner_loop = HasInnerLoop(for_node->body);
     if (!has_inner_loop) {
       SafeMemorysRewriter rewriter(analyzer_);
       for_node.CopyOnWrite()->body = rewriter(for_node->body);
-      // // Detect Buffer Load Node in the loop body, collect the indices and buffer size
+      // // Detect Buffer Load Node in the loop body, collect the indices and
+      // buffer size
 
       // // Run the checker on the loop body
       // GlobalMemChecker checker(analyzer_);
@@ -257,7 +263,7 @@ class SafeMemoryLegalizer : IRMutatorWithAnalyzer {
     return IRMutatorWithAnalyzer::VisitStmt_(op);
   }
 
-  static bool HasInnerLoop(const Stmt& stmt) {
+  static bool HasInnerLoop(const Stmt &stmt) {
     LeafForFinder finder;
     finder(stmt);
     return finder.leaf_for_nodes.size() > 0;
@@ -279,5 +285,5 @@ tvm::transform::Pass LegalizeSafeMemoryAccess() {
 TVM_REGISTER_GLOBAL("tl.transform.LegalizeSafeMemoryAccess")
     .set_body_typed(LegalizeSafeMemoryAccess);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

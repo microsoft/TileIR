@@ -18,18 +18,18 @@ namespace tl {
 using namespace tir;
 
 class Gemm : public Operator {
- public:
+public:
   Gemm(Array<PrimExpr> args, BufferMap vmap);
-  Stmt Lower(const LowerArgs& T, arith::Analyzer* analyzer) const final;
-  LayoutMap InferLayout(const LayoutInferArgs& T, InferLevel level) final;
-  static const Op& Get();
+  Stmt Lower(const LowerArgs &T, arith::Analyzer *analyzer) const final;
+  LayoutMap InferLayout(const LayoutInferArgs &T, InferLevel level) final;
+  static const Op &Get();
   enum class GemmWarpPolicy {
     kSquare = 0,
     kFullRow = 1,
     kFullCol = 2,
   } policy;
 
- private:
+private:
   std::pair<int, int> ComputeWarpPartition(int num_warps, Target target) const;
 
   Array<PrimExpr> call_args;
@@ -38,11 +38,11 @@ class Gemm : public Operator {
   int M, N, K;
   // k_pack please ref to bitblas/tl/mfma_macro_generator.py::k_pack
   // only will be enabled under cdna mfma instructions
-  int kPack = 1; 
+  int kPack = 1;
   bool completed_ = false;
 };
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm
 
-#endif  //  TVM_TL_OP_GEMM_H_
+#endif //  TVM_TL_OP_GEMM_H_

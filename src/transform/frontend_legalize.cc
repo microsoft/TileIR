@@ -34,19 +34,19 @@ namespace tl {
 using namespace tir;
 
 class FrontendLegalizer : public arith::IRMutatorWithAnalyzer {
- public:
+public:
   static PrimFunc Substitute(PrimFunc f) {
     arith::Analyzer analyzer;
     FrontendLegalizer substituter(&analyzer);
-    PrimFuncNode* fptr = f.CopyOnWrite();
+    PrimFuncNode *fptr = f.CopyOnWrite();
     fptr->body = substituter.VisitStmt(f->body);
     return f;
   }
 
- private:
+private:
   using arith::IRMutatorWithAnalyzer::IRMutatorWithAnalyzer;
 
-  Stmt VisitStmt_(const ForNode* node) final {
+  Stmt VisitStmt_(const ForNode *node) final {
     if (node->kind == ForKind::kParallel) {
       parallel_for_scope_++;
     }
@@ -57,7 +57,7 @@ class FrontendLegalizer : public arith::IRMutatorWithAnalyzer {
     return n;
   }
 
-  PrimExpr VisitExpr_(const VarNode* node) final {
+  PrimExpr VisitExpr_(const VarNode *node) final {
     if (let_bindings_.count(node)) {
       return arith::IRMutatorWithAnalyzer::VisitExpr(let_bindings_[node]);
     } else {
@@ -65,18 +65,18 @@ class FrontendLegalizer : public arith::IRMutatorWithAnalyzer {
     }
   }
 
-  Stmt VisitStmt_(const LetStmtNode* node) final {
+  Stmt VisitStmt_(const LetStmtNode *node) final {
     let_bindings_[node->var.get()] = node->value;
     return arith::IRMutatorWithAnalyzer::VisitStmt(node->body);
   }
 
-  PrimExpr VisitExpr_(const LetNode* node) final {
+  PrimExpr VisitExpr_(const LetNode *node) final {
     let_bindings_[node->var.get()] = node->value;
     return arith::IRMutatorWithAnalyzer::VisitExpr(node->body);
   }
 
   int parallel_for_scope_ = 0;
-  std::unordered_map<const VarNode*, PrimExpr> let_bindings_;
+  std::unordered_map<const VarNode *, PrimExpr> let_bindings_;
 };
 
 using namespace tir::transform;
@@ -91,5 +91,5 @@ Pass FrontendLegalize() {
 TVM_REGISTER_GLOBAL("tl.transform.FrontendLegalize")
     .set_body_typed(FrontendLegalize);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

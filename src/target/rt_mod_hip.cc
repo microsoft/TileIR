@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
- 
+
 #if defined(__linux__)
 #include <sys/stat.h>
 #endif
@@ -8,28 +8,28 @@
 #include <hip/hip_runtime.h>
 #include <hip/hiprtc.h>
 
-#include "runtime/rocm/rocm_module.h"
 #include "codegen_hip.h"
+#include "runtime/rocm/rocm_module.h"
 
 namespace tvm {
 namespace codegen {
 
-
-#define HIPRTC_CALL(x)                                                                  \
+#define HIPRTC_CALL(x)                                                         \
   \  
-  {                                                                                     \
+  {                                                                            \
     \  
-    hiprtcResult result = x;                                                            \
+    hiprtcResult result = x;                                                   \
     \  
-    if (result != HIPRTC_SUCCESS) {                                                     \
+    if (result != HIPRTC_SUCCESS) {                                            \
       \  
-      LOG(FATAL)                                                                        \
-          << "HiprtcError: " #x " failed with error: " << hiprtcGetErrorString(result); \
+      LOG(FATAL)                                                               \
+          << "HiprtcError: " #x " failed with error: "                         \
+          << hiprtcGetErrorString(result);                                     \
       \  
-                                                                                   \
-    }                                                                                   \
+                                                                                                                                                         \
+    }                                                                          \
     \  
-                                                                                   \
+                                                                                                                                                           \
   }
 
 static std::string FindHIPIncludePath() {
@@ -39,7 +39,7 @@ static std::string FindHIPIncludePath() {
   const std::string delimiter = "/";
 #endif
   std::string hip_include_path;
-  const char* hip_path_env = std::getenv("HIP_PATH");
+  const char *hip_path_env = std::getenv("HIP_PATH");
   if (hip_path_env != nullptr) {
     hip_include_path += hip_path_env;
     hip_include_path += delimiter + "include";
@@ -58,19 +58,24 @@ static std::string FindHIPIncludePath() {
   }
 #endif
   LOG(FATAL) << "Cannot find HIP include path."
-             << "HIP_PATH is not set or ROCm is not installed in the default installation path."
+             << "HIP_PATH is not set or ROCm is not installed in the default "
+                "installation path."
              << "In other than linux, it is necessary to set HIP_PATH.";
   return hip_include_path;
 }
 
-static std::string HIPRTCCompile(const std::string& code, bool include_path = false) {
+static std::string HIPRTCCompile(const std::string &code,
+                                 bool include_path = false) {
   std::vector<std::string> compile_params;
-  std::vector<const char*> param_cstrings{};
+  std::vector<const char *> param_cstrings{};
   hiprtcProgram prog;
-  std::string cc = "gfx900";  // Default target architecture (can be changed as needed)
+  std::string cc =
+      "gfx900"; // Default target architecture (can be changed as needed)
   int major, minor;
-  hipError_t e1 = hipDeviceGetAttribute(&major, hipDeviceAttributeComputeCapabilityMajor, 0);
-  hipError_t e2 = hipDeviceGetAttribute(&minor, hipDeviceAttributeComputeCapabilityMinor, 0);
+  hipError_t e1 = hipDeviceGetAttribute(
+      &major, hipDeviceAttributeComputeCapabilityMajor, 0);
+  hipError_t e2 = hipDeviceGetAttribute(
+      &minor, hipDeviceAttributeComputeCapabilityMinor, 0);
 
   if (e1 == hipSuccess && e2 == hipSuccess) {
     cc = "gfx" + std::to_string(major * 100 + minor * 10);
@@ -86,10 +91,11 @@ static std::string HIPRTCCompile(const std::string& code, bool include_path = fa
     compile_params.push_back(include_option);
   }
 
-  for (const auto& string : compile_params) {
+  for (const auto &string : compile_params) {
     param_cstrings.push_back(string.c_str());
   }
-  HIPRTC_CALL(hiprtcCreateProgram(&prog, code.c_str(), nullptr, 0, nullptr, nullptr));
+  HIPRTC_CALL(
+      hiprtcCreateProgram(&prog, code.c_str(), nullptr, 0, nullptr, nullptr));
   hiprtcResult compile_res =
       hiprtcCompileProgram(prog, param_cstrings.size(), param_cstrings.data());
 
@@ -110,11 +116,13 @@ static std::string HIPRTCCompile(const std::string& code, bool include_path = fa
   return code_out;
 }
 
-static std::unordered_map<std::string, runtime::FunctionInfo> ExtractFuncInfo(const IRModule& mod) {
+static std::unordered_map<std::string, runtime::FunctionInfo>
+ExtractFuncInfo(const IRModule &mod) {
   std::unordered_map<std::string, runtime::FunctionInfo> fmap;
 
   for (auto kv : mod->functions) {
-    ICHECK(kv.second->IsInstance<tir::PrimFuncNode>()) << "Can only lower IR Module with PrimFuncs";
+    ICHECK(kv.second->IsInstance<tir::PrimFuncNode>())
+        << "Can only lower IR Module with PrimFuncs";
     auto f = Downcast<tir::PrimFunc>(kv.second);
 
     runtime::FunctionInfo info;
@@ -129,7 +137,7 @@ static std::unordered_map<std::string, runtime::FunctionInfo> ExtractFuncInfo(co
       info.arg_types.push_back(f->params[i].dtype());
     }
     if (auto opt = f->GetAttr<Array<String>>(tir::attr::kKernelLaunchParams)) {
-      for (const auto& tag : opt.value()) {
+      for (const auto &tag : opt.value()) {
         info.launch_param_tags.push_back(tag);
       }
     }
@@ -146,7 +154,8 @@ runtime::Module BuildTileLangHIP(IRModule mod, Target target) {
   cg.Init(output_ssa);
 
   for (auto kv : mod->functions) {
-    ICHECK(kv.second->IsInstance<PrimFuncNode>()) << "CodeGenTileLangHIP: Can only take PrimFunc";
+    ICHECK(kv.second->IsInstance<PrimFuncNode>())
+        << "CodeGenTileLangHIP: Can only take PrimFunc";
     auto f = Downcast<PrimFunc>(kv.second);
     auto calling_conv = f->GetAttr<Integer>(tvm::attr::kCallingConv);
     ICHECK(calling_conv == CallingConv::kDeviceKernelLaunch);
@@ -154,21 +163,23 @@ runtime::Module BuildTileLangHIP(IRModule mod, Target target) {
   }
 
   std::string code = cg.Finish();
-  if (const auto* f = Registry::Get("tvm_callback_hip_postproc")) {
+  if (const auto *f = Registry::Get("tvm_callback_hip_postproc")) {
     code = (*f)(code, target).operator std::string();
   }
   std::string fmt = "ptx";
   std::string ptx;
-  if (const auto* f = Registry::Get("tvm_callback_hip_compile")) {
+  if (const auto *f = Registry::Get("tvm_callback_hip_compile")) {
     ptx = (*f)(code, target).operator std::string();
-    if (ptx[0] != '/') fmt = "hsaco";
+    if (ptx[0] != '/')
+      fmt = "hsaco";
   } else {
     ptx = HIPRTCCompile(code, false);
   }
   return ROCMModuleCreate(ptx, fmt, ExtractFuncInfo(mod), code, std::string());
 }
 
-TVM_REGISTER_GLOBAL("target.build.tilelang_hip").set_body_typed(BuildTileLangHIP);
+TVM_REGISTER_GLOBAL("target.build.tilelang_hip")
+    .set_body_typed(BuildTileLangHIP);
 
-}  // namespace codegen
-}  // namespace tvm
+} // namespace codegen
+} // namespace tvm

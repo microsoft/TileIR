@@ -18,13 +18,13 @@ namespace tl {
 using namespace tir;
 
 class ReduceOp : public Operator {
- public:
+public:
   ReduceOp(Array<PrimExpr> args, BufferMap vmap);
-  Stmt Lower(const LowerArgs& T, arith::Analyzer* analyzer) const final;
-  LayoutMap InferLayout(const LayoutInferArgs& T, InferLevel level) final;
-  static const Op& Get();
+  Stmt Lower(const LowerArgs &T, arith::Analyzer *analyzer) const final;
+  LayoutMap InferLayout(const LayoutInferArgs &T, InferLevel level) final;
+  static const Op &Get();
 
- private:
+private:
   tir::Buffer src, dst;
   int dim;
   enum class ReduceType {
@@ -36,11 +36,11 @@ class ReduceOp : public Operator {
   bool clear;
 
   PrimExpr MakeInitValue() const;
-  PrimExpr MakeReduce(const PrimExpr& a, const PrimExpr& b) const;
+  PrimExpr MakeReduce(const PrimExpr &a, const PrimExpr &b) const;
   std::string MakeCodegenReducer() const;
 };
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm
 
-#endif  //  TVM_TL_OP_REDUCE_H_
+#endif //  TVM_TL_OP_REDUCE_H_

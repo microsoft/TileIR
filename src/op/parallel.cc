@@ -39,21 +39,22 @@ using namespace tir;
 namespace attr {
 /*! \brief Mark that how the loop is vectorized. */
 constexpr const char *coalesced_width = "coalesced_width";
-}
+} // namespace attr
 
 class IfBufferRemapLoopGenerator : public StmtExprMutator {
- public:
+public:
   static For run(Stmt stmt, Map<Buffer, Buffer> buffer_remap,
                  Map<Buffer, Layout> layout_map) {
     IfBufferRemapLoopGenerator generator(buffer_remap, layout_map);
     return Downcast<For>(generator(std::move(stmt)));
   }
 
- private:
-  IfBufferRemapLoopGenerator(Map<Buffer, Buffer> buffer_remap, Map<Buffer, Layout> layout_map)
+private:
+  IfBufferRemapLoopGenerator(Map<Buffer, Buffer> buffer_remap,
+                             Map<Buffer, Layout> layout_map)
       : buffer_remap_(buffer_remap), layout_map_(layout_map) {}
 
-  PrimExpr VisitExpr_(const BufferLoadNode* op) final {
+  PrimExpr VisitExpr_(const BufferLoadNode *op) final {
     auto load = Downcast<BufferLoad>(StmtExprMutator::VisitExpr_(op));
 
     if (buffer_remap_.count(load->buffer)) {
@@ -65,7 +66,7 @@ class IfBufferRemapLoopGenerator : public StmtExprMutator {
     return load;
   }
 
-  Stmt VisitStmt_(const BufferStoreNode* op) final {
+  Stmt VisitStmt_(const BufferStoreNode *op) final {
     auto store = Downcast<BufferStore>(StmtExprMutator::VisitStmt_(op));
     if (buffer_remap_.count(store->buffer)) {
       auto new_indices = layout_map_[store->buffer]->Forward(store->indices);
@@ -79,18 +80,20 @@ class IfBufferRemapLoopGenerator : public StmtExprMutator {
   Map<Buffer, Layout> layout_map_;
 };
 
-void ParallelLoopNestVisitor::VisitStmt_(const ForNode* op) {
+void ParallelLoopNestVisitor::VisitStmt_(const ForNode *op) {
   ICHECK(op->kind == ForKind::kParallel);
-  p->loop_vars_.push_back(IterVar(Range(op->min, op->extent), op->loop_var, IterVarType::kDataPar));
+  p->loop_vars_.push_back(
+      IterVar(Range(op->min, op->extent), op->loop_var, IterVarType::kDataPar));
   p->analyzer_.Bind(op->loop_var, Range::FromMinExtent(op->min, op->extent));
   StmtExprVisitor::VisitStmt_(op);
 }
 
-void ParallelLoopNestVisitor::VisitStmt_(const BufferStoreNode* op) {
+void ParallelLoopNestVisitor::VisitStmt_(const BufferStoreNode *op) {
   if (op->buffer.scope() == "local.fragment") {
     if (p->indice_map_.find(op->buffer) != p->indice_map_.end()) {
       ICHECK(StructuralEqual()(p->indice_map_.at(op->buffer), op->indices))
-          << op->buffer << ": " << op->indices << " and " << p->indice_map_.at(op->buffer);
+          << op->buffer << ": " << op->indices << " and "
+          << p->indice_map_.at(op->buffer);
     } else {
       p->indice_map_.Set(op->buffer, op->indices);
     }
@@ -99,11 +102,12 @@ void ParallelLoopNestVisitor::VisitStmt_(const BufferStoreNode* op) {
   StmtExprVisitor::VisitStmt_(op);
 }
 
-void ParallelLoopNestVisitor::VisitExpr_(const BufferLoadNode* op) {
+void ParallelLoopNestVisitor::VisitExpr_(const BufferLoadNode *op) {
   if (op->buffer.scope() == "local.fragment") {
     if (p->indice_map_.find(op->buffer) != p->indice_map_.end()) {
       ICHECK(StructuralEqual()(p->indice_map_.at(op->buffer), op->indices))
-          << op->buffer << ": " << op->indices << " and " << p->indice_map_.at(op->buffer);
+          << op->buffer << ": " << op->indices << " and "
+          << p->indice_map_.at(op->buffer);
     } else {
       p->indice_map_.Set(op->buffer, op->indices);
     }
@@ -113,18 +117,20 @@ void ParallelLoopNestVisitor::VisitExpr_(const BufferLoadNode* op) {
 
 ParallelOp::ParallelOp(For root) : root_(root), V(this) { V.VisitStmt(root); }
 
-bool ParallelOp::IsCommonAccessIndice(const Buffer& buffer) const {
-  auto common_indice = loop_vars_.Map([](const auto& iv) { return iv->var; });
+bool ParallelOp::IsCommonAccessIndice(const Buffer &buffer) const {
+  auto common_indice = loop_vars_.Map([](const auto &iv) { return iv->var; });
   return StructuralEqual()(indice_map_[buffer], common_indice);
 }
 
-LayoutMap ParallelOp::InferLayout(const LayoutInferArgs& T, InferLevel level) {
-  if (loop_layout_.defined()) return {};
-  if (level == InferLevel::kStrict) return {};
+LayoutMap ParallelOp::InferLayout(const LayoutInferArgs &T, InferLevel level) {
+  if (loop_layout_.defined())
+    return {};
+  if (level == InferLevel::kStrict)
+    return {};
 
   // Step 1: try to infer loop's partition from a source fragment
   Buffer source_buffer, read_source_buffer;
-  for (const auto& [buffer, _] : indice_map_) {
+  for (const auto &[buffer, _] : indice_map_) {
     if (T.layout_map.count(buffer)) {
       auto frag = T.layout_map[buffer].as<Fragment>().value();
       if (buffer_is_write_.count(buffer))
@@ -133,14 +139,16 @@ LayoutMap ParallelOp::InferLayout(const LayoutInferArgs& T, InferLevel level) {
         read_source_buffer = buffer;
     }
   }
-  auto compute_loop_layout_from_buffer = [&](const Buffer& buffer) {
+  auto compute_loop_layout_from_buffer = [&](const Buffer &buffer) {
     Fragment src_layout = T.layout_map[buffer].as<Fragment>().value();
     if (IsCommonAccessIndice(buffer)) {
       return src_layout;
     } else {
       Var rep;
-      auto rep_iter = IterVar({0, src_layout->ReplicateExtent()}, rep, IterVarType::kDataPar);
-      PrimExpr loop_var_to_thread = src_layout->ForwardThread(indice_map_[buffer], rep);
+      auto rep_iter = IterVar({0, src_layout->ReplicateExtent()}, rep,
+                              IterVarType::kDataPar);
+      PrimExpr loop_var_to_thread =
+          src_layout->ForwardThread(indice_map_[buffer], rep);
       return Fragment(loop_vars_, {}, loop_var_to_thread, rep_iter);
     }
   };
@@ -150,12 +158,14 @@ LayoutMap ParallelOp::InferLayout(const LayoutInferArgs& T, InferLevel level) {
     if (read_source_buffer.defined()) {
       loop_layout_ = compute_loop_layout_from_buffer(read_source_buffer);
       // Loop don't need to be replicated.
-      if (!is_one(loop_layout_->ReplicateExtent())) loop_layout_ = loop_layout_->DeReplicate();
+      if (!is_one(loop_layout_->ReplicateExtent()))
+        loop_layout_ = loop_layout_->DeReplicate();
       // if still has replication, add a condition
       if (!is_one(loop_layout_->ReplicateExtent())) {
         auto inv = loop_layout_->Inverse();
         Array<PrimExpr> fwd;
-        for (size_t i = 0; i < loop_layout_->OutputDim(); i++) fwd.push_back(0);
+        for (size_t i = 0; i < loop_layout_->OutputDim(); i++)
+          fwd.push_back(0);
         fwd.push_back(InputPlaceholder(0));
         auto rep = inv->Forward(fwd).back();
         AddPredicate(EQ(rep, 0));
@@ -163,17 +173,19 @@ LayoutMap ParallelOp::InferLayout(const LayoutInferArgs& T, InferLevel level) {
     } else {
       // Vectorize Size must be aware of the buffer_remap
       // As the pass will do post processing to the layout
-      auto maybe_remapped_root_ = IfBufferRemapLoopGenerator::run(root_, T.buffer_remap, T.layout_map);
+      auto maybe_remapped_root_ =
+          IfBufferRemapLoopGenerator::run(root_, T.buffer_remap, T.layout_map);
       int vector_size = GetVectorizeSize(maybe_remapped_root_);
 
       // Check if coalesced_width is defined
-      if (auto coalesced_width = root_->annotations.Get(tl::attr::coalesced_width)) {
-        if (const auto* imm = coalesced_width.as<IntImmNode>()) {
+      if (auto coalesced_width =
+              root_->annotations.Get(tl::attr::coalesced_width)) {
+        if (const auto *imm = coalesced_width.as<IntImmNode>()) {
           int expected = imm->value;
           // Verify that vector_size is divisible by expected
           if (vector_size % expected != 0) {
-            LOG(FATAL) << "Vector size " << vector_size << " is not divisible by coalesced width "
-                       << expected;
+            LOG(FATAL) << "Vector size " << vector_size
+                       << " is not divisible by coalesced width " << expected;
           }
           vector_size = expected;
         } else {
@@ -184,31 +196,37 @@ LayoutMap ParallelOp::InferLayout(const LayoutInferArgs& T, InferLevel level) {
       loop_layout_ = PlanLoopPartition(root_, T.block_size, vector_size);
     }
     PrimExpr loop_thread_extent = loop_layout_->ThreadExtent();
-    if (!analyzer_.CanProveEqual(loop_thread_extent, static_cast<int>(T.block_size)))
+    if (!analyzer_.CanProveEqual(loop_thread_extent,
+                                 static_cast<int>(T.block_size)))
       AddPredicate(LT(InputPlaceholder(0), loop_thread_extent));
   } else {
     return {};
   }
-  // Step 2: Check that the loop's partition can correctly align with all source fragment
-  for (const auto& [buffer, _] : indice_map_) {
+  // Step 2: Check that the loop's partition can correctly align with all source
+  // fragment
+  for (const auto &[buffer, _] : indice_map_) {
     if (T.layout_map.count(buffer)) {
       auto fragment = T.layout_map[buffer].as<Fragment>().value();
       // TODO: Add thread checks for replicated cases
       // need to wildcard match the rhs with lhs
-      if (!is_one(loop_layout_->ReplicateExtent()) || !is_one(fragment->ReplicateExtent()))
+      if (!is_one(loop_layout_->ReplicateExtent()) ||
+          !is_one(fragment->ReplicateExtent()))
         continue;
-      auto vars = loop_vars_.Map([](const IterVar& iv) { return PrimExpr(iv->var); });
+      auto vars =
+          loop_vars_.Map([](const IterVar &iv) { return PrimExpr(iv->var); });
       auto lhs = loop_layout_->ForwardThread(vars, NullOpt);
       auto rhs = fragment->ForwardThread(indice_map_[buffer], NullOpt);
       auto diff = analyzer_.Simplify(lhs - rhs);
-      ICHECK(is_zero(diff)) << "Layout infer conflict for " << buffer << " " << source_buffer
-                            << "\nLHS = " << lhs << "\nRHS = " << rhs;
+      ICHECK(is_zero(diff))
+          << "Layout infer conflict for " << buffer << " " << source_buffer
+          << "\nLHS = " << lhs << "\nRHS = " << rhs;
     }
   }
   // Step 3: Infer other fragment's layout from the loop's partition
   LayoutMap results;
-  for (const auto& [buffer, _] : indice_map_) {
-    if (!T.layout_map.count(buffer)) results.Set(buffer, CompleteBufferFragment(buffer));
+  for (const auto &[buffer, _] : indice_map_) {
+    if (!T.layout_map.count(buffer))
+      results.Set(buffer, CompleteBufferFragment(buffer));
   }
   return results;
 }
@@ -221,18 +239,20 @@ Optional<PrimExpr> ParallelOp::GetPredicate(Var thread_var) const {
   }
 }
 
-Fragment ParallelOp::CompleteBufferFragment(const Buffer& buffer) {
+Fragment ParallelOp::CompleteBufferFragment(const Buffer &buffer) {
   ICHECK(loop_layout_.defined());
-  if (IsCommonAccessIndice(buffer)) return loop_layout_;
+  if (IsCommonAccessIndice(buffer))
+    return loop_layout_;
 
-  PrimExpr rep_b =
-      MakeFlattenedExpression(DivideUnusedIterators(indice_map_[buffer], loop_vars_, &analyzer_));
+  PrimExpr rep_b = MakeFlattenedExpression(
+      DivideUnusedIterators(indice_map_[buffer], loop_vars_, &analyzer_));
 
   auto bijective_indice = indice_map_[buffer];
   bijective_indice.push_back(rep_b);
   Layout ind_inv = Layout(loop_vars_, bijective_indice)->Inverse();
 
-  PrimExpr indice_rep_extent = ind_inv->InputShape().back();  // this is the size of rep_b
+  PrimExpr indice_rep_extent =
+      ind_inv->InputShape().back(); // this is the size of rep_b
   PrimExpr loop_rep_extent = loop_layout_->ReplicateExtent();
   PrimExpr dest_buffer_rep_extent = indice_rep_extent * loop_rep_extent;
 
@@ -242,11 +262,12 @@ Fragment ParallelOp::CompleteBufferFragment(const Buffer& buffer) {
   }
   fwd.push_back(FloorMod(ReplicationPlaceholder(), indice_rep_extent));
   PrimExpr thd_b = loop_layout_->ForwardThread(
-      ind_inv->Forward(fwd), FloorDiv(ReplicationPlaceholder(), indice_rep_extent));
+      ind_inv->Forward(fwd),
+      FloorDiv(ReplicationPlaceholder(), indice_rep_extent));
 
   return Fragment(buffer->shape, {}, thd_b, dest_buffer_rep_extent, NullOpt)
       ->CondenseReplicateVar();
 }
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

@@ -34,20 +34,23 @@ PrimExpr SwizzlePattern::swizzle(PrimExpr expr) const {
   return low + high * base;
 }
 
-bool SwizzlePattern::operator==(const SwizzlePattern& other) const {
-  return std::tie(base_, bits_, shift_) == std::tie(other.base_, other.bits_, other.shift_);
+bool SwizzlePattern::operator==(const SwizzlePattern &other) const {
+  return std::tie(base_, bits_, shift_) ==
+         std::tie(other.base_, other.bits_, other.shift_);
 }
 
-SwizzledLayoutNode::SwizzledLayoutNode(Array<PrimExpr> input_size, Array<PrimExpr> forward_index,
+SwizzledLayoutNode::SwizzledLayoutNode(Array<PrimExpr> input_size,
+                                       Array<PrimExpr> forward_index,
                                        SwizzlePattern pattern)
     : pattern_(pattern) {
   input_size_ = input_size;
   arith::Analyzer analyzer;
   UpdateAnalyzer(&analyzer);
-  forward_index_ = forward_index.Map([&](const PrimExpr& e) { return analyzer.Simplify(e); });
+  forward_index_ = forward_index.Map(
+      [&](const PrimExpr &e) { return analyzer.Simplify(e); });
 }
 
-Array<PrimExpr> SwizzledLayoutNode::Forward(const Array<PrimExpr>& vars) const {
+Array<PrimExpr> SwizzledLayoutNode::Forward(const Array<PrimExpr> &vars) const {
   auto expr_list = LayoutNode::Forward(vars);
   auto expr = expr_list.back();
   expr_list.pop_back();
@@ -57,8 +60,8 @@ Array<PrimExpr> SwizzledLayoutNode::Forward(const Array<PrimExpr>& vars) const {
 
 void SwizzledLayoutNode::DebugOutput() const {
   LayoutNode::DebugOutput();
-  std::cout << "Layout Swizzle: " << pattern_.Base() << " " << pattern_.Bits() << " "
-            << pattern_.Shift();
+  std::cout << "Layout Swizzle: " << pattern_.Base() << " " << pattern_.Bits()
+            << " " << pattern_.Shift();
 }
 
 Layout SwizzledLayoutNode::Inverse() const {
@@ -66,7 +69,8 @@ Layout SwizzledLayoutNode::Inverse() const {
   return {};
 }
 
-SwizzledLayout::SwizzledLayout(Array<IterVar> forward_var, Array<PrimExpr> forward_index,
+SwizzledLayout::SwizzledLayout(Array<IterVar> forward_var,
+                               Array<PrimExpr> forward_index,
                                SwizzlePattern pattern) {
   Map<Var, PrimExpr> vmap;
   Array<PrimExpr> input_size;
@@ -75,26 +79,32 @@ SwizzledLayout::SwizzledLayout(Array<IterVar> forward_var, Array<PrimExpr> forwa
     CHECK(is_zero(forward_var[i]->dom->min));
     input_size.push_back(forward_var[i]->dom->extent);
   }
-  forward_index = forward_index.Map([&](const PrimExpr& e) { return Substitute(e, vmap); });
+  forward_index =
+      forward_index.Map([&](const PrimExpr &e) { return Substitute(e, vmap); });
 
   auto n = make_object<SwizzledLayoutNode>(input_size, forward_index, pattern);
   data_ = std::move(n);
 }
 
-SwizzledLayout::SwizzledLayout(Array<PrimExpr> input_size, Array<PrimExpr> forward_index,
+SwizzledLayout::SwizzledLayout(Array<PrimExpr> input_size,
+                               Array<PrimExpr> forward_index,
                                SwizzlePattern pattern) {
   auto n = make_object<SwizzledLayoutNode>(input_size, forward_index, pattern);
   data_ = std::move(n);
 }
 
-void SwizzledLayoutNode::VisitAttrs(tvm::AttrVisitor* v) { LayoutNode::VisitAttrs(v); }
+void SwizzledLayoutNode::VisitAttrs(tvm::AttrVisitor *v) {
+  LayoutNode::VisitAttrs(v);
+}
 
-bool SwizzledLayoutNode::SEqualReduce(const SwizzledLayoutNode* other, SEqualReducer equal) const {
+bool SwizzledLayoutNode::SEqualReduce(const SwizzledLayoutNode *other,
+                                      SEqualReducer equal) const {
   return equal(this->InputShape(), other->InputShape()) &&
-         equal(this->forward_index_, other->forward_index_) && pattern_ == other->pattern_;
+         equal(this->forward_index_, other->forward_index_) &&
+         pattern_ == other->pattern_;
 }
 
 TVM_REGISTER_NODE_TYPE(SwizzledLayoutNode);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

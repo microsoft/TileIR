@@ -30,8 +30,8 @@
 
 #include <queue>
 
-#include "arith/ir_mutator_with_analyzer.h"
 #include "../op/parallel.h"
+#include "arith/ir_mutator_with_analyzer.h"
 #include "loop_partition.h"
 #include "loop_vectorize.h"
 
@@ -43,25 +43,26 @@ using arith::IRMutatorWithAnalyzer;
 
 // Class to legalize vectorized loops by transforming them appropriately
 class LoopVectorizedLegalizer : IRMutatorWithAnalyzer {
- public:
+public:
   // Static method to substitute and transform the given PrimFunc
   static PrimFunc Substitute(PrimFunc f) {
     arith::Analyzer analyzer;
     // Create an instance of the legalizer with the analyzer
     LoopVectorizedLegalizer substituter(&analyzer);
     // Get a mutable copy of the function node
-    PrimFuncNode* fptr = f.CopyOnWrite();
+    PrimFuncNode *fptr = f.CopyOnWrite();
     // Apply the legalizer to the function body
     fptr->body = substituter.VisitStmt(f->body);
     return f;
   }
 
- private:
+private:
   // Constructor initializing the base class with the analyzer
-  LoopVectorizedLegalizer(arith::Analyzer* analyzer) : arith::IRMutatorWithAnalyzer(analyzer) {}
+  LoopVectorizedLegalizer(arith::Analyzer *analyzer)
+      : arith::IRMutatorWithAnalyzer(analyzer) {}
 
   // Override the VisitStmt_ method to handle ForNode (loop statements)
-  Stmt VisitStmt_(const ForNode* op) final {
+  Stmt VisitStmt_(const ForNode *op) final {
     // Visit and potentially modify the loop node
     For for_node = Downcast<For>(IRMutatorWithAnalyzer::VisitStmt_(op));
     // If the loop is not vectorized, proceed with the default behavior
@@ -90,5 +91,5 @@ tvm::transform::Pass LegalizeVectorizedLoop() {
 TVM_REGISTER_GLOBAL("tl.transform.LegalizeVectorizedLoop")
     .set_body_typed(LegalizeVectorizedLoop);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

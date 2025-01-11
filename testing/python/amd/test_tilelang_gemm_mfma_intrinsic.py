@@ -5,7 +5,6 @@ import torch
 import torch.backends
 import tilelang.testing
 from tilelang import tvm as tvm
-from tvm import DataType
 import tilelang as TL
 import tilelang.language as T
 from tilelang.intrinsics import make_mfma_swizzle_layout as make_swizzle_layout

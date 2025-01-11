@@ -38,10 +38,10 @@ using namespace tir;
 enum class Proxy { kGeneric, kAsync, kBoth };
 
 class ProxyMarker : public StmtVisitor {
- public:
+public:
   ProxyMarker() = default;
 
-  Proxy GetProxy(const StmtNode* stmt) const {
+  Proxy GetProxy(const StmtNode *stmt) const {
     auto it = map_.find(stmt);
     // ICHECK(it != map_.end());
     // TODO: This is a hack implementation to avoid the ICHECK failure.
@@ -51,9 +51,9 @@ class ProxyMarker : public StmtVisitor {
     return it->second;
   }
 
-  Proxy GetProxy(const Stmt& stmt) const { return GetProxy(stmt.get()); }
+  Proxy GetProxy(const Stmt &stmt) const { return GetProxy(stmt.get()); }
 
-  void VisitStmt_(const EvaluateNode* op) final {
+  void VisitStmt_(const EvaluateNode *op) final {
     Proxy proxy = Proxy::kAsync;
     if (auto call = op->value.as<CallNode>()) {
       if (call->op.same_as(LDMatrixOp()) || call->op.same_as(STMatrixOp())) {
@@ -63,12 +63,12 @@ class ProxyMarker : public StmtVisitor {
     SetProxy(op, proxy);
   }
 
-  void VisitStmt_(const BufferStoreNode* op) final {
+  void VisitStmt_(const BufferStoreNode *op) final {
     Proxy proxy = Proxy::kGeneric;
     SetProxy(op, proxy);
   }
 
-  void VisitStmt_(const SeqStmtNode* op) final {
+  void VisitStmt_(const SeqStmtNode *op) final {
     StmtVisitor::VisitStmt_(op);
     auto role = GetProxy(op->seq[0]);
     for (auto stmt : op->seq) {
@@ -80,61 +80,59 @@ class ProxyMarker : public StmtVisitor {
     SetProxy(op, role);
   }
 
-  void VisitStmt_(const IfThenElseNode* op) final {
+  void VisitStmt_(const IfThenElseNode *op) final {
     StmtVisitor::VisitStmt_(op);
     auto role = GetProxy(op->then_case);
     if (op->else_case.defined()) {
       auto role_else = GetProxy(op->else_case.value());
-      if (role != role_else) role = Proxy::kBoth;
+      if (role != role_else)
+        role = Proxy::kBoth;
     }
     SetProxy(op, role);
   }
 
-  void VisitStmt_(const BlockRealizeNode* op) final {
+  void VisitStmt_(const BlockRealizeNode *op) final {
     StmtVisitor::VisitStmt_(op);
     SetProxy(op, GetProxy(op->block));
   }
 
-  template <class NodeType>
-  void HandleBodyStmt(const NodeType* op) {
+  template <class NodeType> void HandleBodyStmt(const NodeType *op) {
     StmtVisitor::VisitStmt_(op);
     SetProxy(op, GetProxy(op->body));
   }
 
-  void VisitStmt_(const ForNode* op) final { HandleBodyStmt(op); }
-  void VisitStmt_(const LetStmtNode* op) final { HandleBodyStmt(op); }
-  void VisitStmt_(const AttrStmtNode* op) final { HandleBodyStmt(op); }
-  void VisitStmt_(const AssertStmtNode* op) final { HandleBodyStmt(op); }
-  void VisitStmt_(const BlockNode* op) final { HandleBodyStmt(op); }
+  void VisitStmt_(const ForNode *op) final { HandleBodyStmt(op); }
+  void VisitStmt_(const LetStmtNode *op) final { HandleBodyStmt(op); }
+  void VisitStmt_(const AttrStmtNode *op) final { HandleBodyStmt(op); }
+  void VisitStmt_(const AssertStmtNode *op) final { HandleBodyStmt(op); }
+  void VisitStmt_(const BlockNode *op) final { HandleBodyStmt(op); }
 
-
-
- private:
-  void SetProxy(const StmtNode* stmt, Proxy proxy) { map_[stmt] = proxy; }
-  std::unordered_map<const StmtNode*, Proxy> map_;
+private:
+  void SetProxy(const StmtNode *stmt, Proxy proxy) { map_[stmt] = proxy; }
+  std::unordered_map<const StmtNode *, Proxy> map_;
 };
 
-
 class InjectFenceProxy : public StmtExprMutator {
- public:
+public:
   static PrimFunc Substitute(PrimFunc f) {
     auto T = InjectFenceProxy();
     f.CopyOnWrite()->body = T(f->body);
     return f;
   }
 
- private:
-  Proxy get_generic_proxy(const Stmt& stmt) {
+private:
+  Proxy get_generic_proxy(const Stmt &stmt) {
     auto marker = ProxyMarker();
     marker(stmt);
     return marker.GetProxy(stmt);
   }
 
-  Stmt VisitStmt_(const SeqStmtNode* op) final {
+  Stmt VisitStmt_(const SeqStmtNode *op) final {
     ICHECK(op->seq.size() > 0);
     Array<Stmt> new_body;
     Proxy cur_proxy, prev_proxy;
-    auto fence_stmt = Evaluate(Call(DataType::Handle(), FenceProxyAsyncOp(), {}));
+    auto fence_stmt =
+        Evaluate(Call(DataType::Handle(), FenceProxyAsyncOp(), {}));
     prev_proxy = get_generic_proxy(op->seq[0]);
     new_body.push_back(VisitStmt(op->seq[0]));
     if (op->seq.size() > 1) {
@@ -171,5 +169,5 @@ tvm::transform::Pass InjectFenceProxy() {
 TVM_REGISTER_GLOBAL("tl.transform.InjectFenceProxy")
     .set_body_typed(InjectFenceProxy);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

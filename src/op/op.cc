@@ -20,13 +20,14 @@ using namespace tir;
 
 TIR_REGISTER_TL_OP(RegionOp, region)
     .set_num_inputs(-1)
-    .set_attr<TCallEffectKind>("TCallEffectKind", Integer(CallEffectKind::kPure));
+    .set_attr<TCallEffectKind>("TCallEffectKind",
+                               Integer(CallEffectKind::kPure));
 
 std::unique_ptr<Operator> ParseOperator(Call call, BufferMap vmap) {
   auto op_map = Op::GetAttrMap<OpBuilderFunc>("TLOpBuilder");
   Op op = call->op.as<Op>().value();
   if (op_map.count(op)) {
-    Operator* ptr = static_cast<Operator*>(op_map[op](call->args, vmap));
+    Operator *ptr = static_cast<Operator *>(op_map[op](call->args, vmap));
     ICHECK(ptr != nullptr);
     return std::unique_ptr<Operator>(ptr);
   }
@@ -41,7 +42,7 @@ std::unique_ptr<Operator> ParseOperator(Stmt stmt, BufferMap vmap) {
   return nullptr;
 }
 
-Var GetVarFromAccessPtr(const PrimExpr& expr) {
+Var GetVarFromAccessPtr(const PrimExpr &expr) {
   auto call = expr.as<CallNode>();
   ICHECK(call);
   ICHECK(call->op.same_as(builtin::tvm_access_ptr()));
@@ -67,20 +68,27 @@ RegionOp::RegionOp(Array<PrimExpr> args, BufferMap vmap) {
 
 bool RegionOp::IsFullRegion() const {
   for (size_t i = 0; i < ranges_.size(); i++) {
-    if (!is_zero(ranges_[i]->min)) return false;
-    if (!StructuralEqual()(ranges_[i]->extent, buffer_->shape[i])) return false;
+    if (!is_zero(ranges_[i]->min))
+      return false;
+    if (!StructuralEqual()(ranges_[i]->extent, buffer_->shape[i]))
+      return false;
   }
   return true;
 }
 
-Stmt Operator::Lower(const LowerArgs& T, arith::Analyzer* analyzer) const {
+Stmt Operator::Lower(const LowerArgs &T, arith::Analyzer *analyzer) const {
   ICHECK(0) << "Not Implemented Lower method.";
   return Evaluate(0);
 }
 
-Stmt Operator::Canonialize(const CanonializeArgs& T, arith::Analyzer* analyzer) const { return {}; }
+Stmt Operator::Canonialize(const CanonializeArgs &T,
+                           arith::Analyzer *analyzer) const {
+  return {};
+}
 
-LayoutMap Operator::InferLayout(const LayoutInferArgs& T, InferLevel level) { return {}; }
+LayoutMap Operator::InferLayout(const LayoutInferArgs &T, InferLevel level) {
+  return {};
+}
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

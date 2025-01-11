@@ -37,15 +37,15 @@ namespace tl {
 using namespace tir;
 
 class LowerHopperIntrin : public StmtExprMutator {
- public:
-  static PrimFunc Substitute(PrimFunc& f) {
-    PrimFuncNode* fptr = f.CopyOnWrite();
+public:
+  static PrimFunc Substitute(PrimFunc &f) {
+    PrimFuncNode *fptr = f.CopyOnWrite();
     LowerHopperIntrin substituter;
     fptr->body = substituter.VisitStmt(f->body);
     for (auto [call, var] : substituter.desc_map_) {
       // Should allocate 128 bytes for TensorMap on stack
-      Call alloc_desc =
-          Call(DataType::Handle(), builtin::tvm_stack_alloca(), {StringImm("arg_value"), 16});
+      Call alloc_desc = Call(DataType::Handle(), builtin::tvm_stack_alloca(),
+                             {StringImm("arg_value"), 16});
       Array<PrimExpr> init_desc_args;
       if (call->op.same_as(CreateTMADescriptorOp())) {
         init_desc_args.push_back(StringImm(tvm_tensormap_create_tiled));
@@ -55,15 +55,19 @@ class LowerHopperIntrin : public StmtExprMutator {
         CHECK(0) << call->op;
       }
       init_desc_args.push_back(var);
-      init_desc_args.insert(init_desc_args.end(), call->args.begin(), call->args.end());
-      Call init_desc = Call(DataType::Handle(), builtin::tvm_call_packed(), init_desc_args);
-      fptr->body = LetStmt(var, alloc_desc, SeqStmt({Evaluate(init_desc), fptr->body}));
+      init_desc_args.insert(init_desc_args.end(), call->args.begin(),
+                            call->args.end());
+      Call init_desc =
+          Call(DataType::Handle(), builtin::tvm_call_packed(), init_desc_args);
+      fptr->body =
+          LetStmt(var, alloc_desc, SeqStmt({Evaluate(init_desc), fptr->body}));
     }
     return f;
   }
 
-  Stmt VisitStmt_(const AttrStmtNode* op) final {
-    // Insert the prefetch TMA descriptor statement TO the beginning of the kernel
+  Stmt VisitStmt_(const AttrStmtNode *op) final {
+    // Insert the prefetch TMA descriptor statement TO the beginning of the
+    // kernel
     if (op->attr_key == tir::attr::thread_extent) {
       IterVar iv = Downcast<IterVar>(op->node);
       if (iv->thread_tag == "threadIdx.x") {
@@ -73,18 +77,22 @@ class LowerHopperIntrin : public StmtExprMutator {
         } else {
           Array<Stmt> stmt_seq;
           if (!init_mbarrier_calls_.empty()) {
-            auto alloc_mbarrier = Evaluate(Call(DataType::Handle(), builtin::create_barriers(),
-                                                {static_cast<int>(init_mbarrier_calls_.size())}));
+            auto alloc_mbarrier =
+                Evaluate(Call(DataType::Handle(), builtin::create_barriers(),
+                              {static_cast<int>(init_mbarrier_calls_.size())}));
             stmt_seq.push_back(alloc_mbarrier);
           }
 
           auto stmts = prefetch_calls_;
-          stmts.insert(stmts.end(), init_mbarrier_calls_.begin(), init_mbarrier_calls_.end());
-          auto init_stmt = IfThenElse(EQ(iv->var, 0), stmts.size() > 1 ? SeqStmt(stmts) : stmts[0]);
+          stmts.insert(stmts.end(), init_mbarrier_calls_.begin(),
+                       init_mbarrier_calls_.end());
+          auto init_stmt = IfThenElse(
+              EQ(iv->var, 0), stmts.size() > 1 ? SeqStmt(stmts) : stmts[0]);
           stmt_seq.push_back(init_stmt);
           if (!init_mbarrier_calls_.empty()) {
-            Stmt mem_sync = Evaluate(
-                Call(DataType::Handle(), builtin::tvm_storage_sync(), {StringImm("shared")}));
+            Stmt mem_sync =
+                Evaluate(Call(DataType::Handle(), builtin::tvm_storage_sync(),
+                              {StringImm("shared")}));
             stmt_seq.push_back(mem_sync);
           }
           stmt_seq.push_back(body);
@@ -98,7 +106,7 @@ class LowerHopperIntrin : public StmtExprMutator {
     return StmtExprMutator::VisitStmt_(op);
   }
 
-  PrimExpr VisitExpr_(const CallNode* call) final {
+  PrimExpr VisitExpr_(const CallNode *call) final {
     if (call->op.same_as(CreateTMADescriptorOp()) ||
         call->op.same_as(CreateTMAIm2ColDescriptorOp())) {
       Var var;
@@ -107,10 +115,12 @@ class LowerHopperIntrin : public StmtExprMutator {
         var = iter->second;
       } else {
         String name = call->args[2].as<Var>().value()->name_hint;
-        var = Var(name + "_desc", PointerType(PrimType(cuTensorMapType()), "grid_constant"));
+        var = Var(name + "_desc",
+                  PointerType(PrimType(cuTensorMapType()), "grid_constant"));
         desc_map_[GetRef<Call>(call)] = var;
-        prefetch_calls_.push_back(Evaluate(Call(DataType::Handle(), builtin::call_extern(),
-                                                {StringImm("tl::prefetch_tma_descriptor"), var})));
+        prefetch_calls_.push_back(
+            Evaluate(Call(DataType::Handle(), builtin::call_extern(),
+                          {StringImm("tl::prefetch_tma_descriptor"), var})));
       }
       return var;
     } else if (call->op.same_as(CreateListofMBarrierOp())) {
@@ -118,24 +128,25 @@ class LowerHopperIntrin : public StmtExprMutator {
       int num_barriers = static_cast<int>(call->args.size());
       for (int i = 0; i < num_barriers; i++) {
         PrimExpr mbarrier = Call(DataType::Handle(), GetMBarrierOp(), {i});
-        init_mbarrier_calls_.push_back(
-            Evaluate(Call(DataType::Handle(), builtin::ptx_init_barrier_thread_count(),
-                          {mbarrier, call->args[i]})));
+        init_mbarrier_calls_.push_back(Evaluate(
+            Call(DataType::Handle(), builtin::ptx_init_barrier_thread_count(),
+                 {mbarrier, call->args[i]})));
       }
       return 0;
     } else if (call->op.same_as(SyncThreadsPartialOp())) {
       int barrier_id = init_mbarrier_calls_.size();
-      PrimExpr mbarrier = Call(DataType::Handle(), GetMBarrierOp(), {barrier_id});
-      init_mbarrier_calls_.push_back(
-          Evaluate(Call(DataType::Handle(), builtin::ptx_init_barrier_thread_count(),
-                        {mbarrier, call->args[0]})));
+      PrimExpr mbarrier =
+          Call(DataType::Handle(), GetMBarrierOp(), {barrier_id});
+      init_mbarrier_calls_.push_back(Evaluate(
+          Call(DataType::Handle(), builtin::ptx_init_barrier_thread_count(),
+               {mbarrier, call->args[0]})));
       return Call(DataType::Handle(), SyncThreadsPartialOp(), {mbarrier});
     } else {
       return StmtExprMutator::VisitExpr_(call);
     }
   }
 
- private:
+private:
   Array<Stmt> prefetch_calls_;
   Array<Stmt> init_mbarrier_calls_;
   std::unordered_map<Call, Var, StructuralHash, ExprDeepEqual> desc_map_;
@@ -154,5 +165,5 @@ tvm::transform::Pass LowerHopperIntrin() {
 TVM_REGISTER_GLOBAL("tl.transform.LowerHopperIntrin")
     .set_body_typed(LowerHopperIntrin);
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

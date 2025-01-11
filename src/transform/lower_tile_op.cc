@@ -27,10 +27,10 @@
 #include <tvm/tir/transform.h>
 #include <tvm/tir/utils.h>
 
-#include "arith/ir_mutator_with_analyzer.h"
 #include "../layout/layout.h"
 #include "../layout/utils.h"
 #include "../op/op.h"
+#include "arith/ir_mutator_with_analyzer.h"
 #include "loop_partition.h"
 
 namespace tvm {
@@ -38,8 +38,9 @@ namespace tl {
 
 using namespace tir;
 
-static Buffer makeBufferWithLayout(const Buffer& buffer, const Layout& layout) {
-  const auto* ptr_type = TVM_TYPE_AS(buffer->data->type_annotation, PointerTypeNode);
+static Buffer makeBufferWithLayout(const Buffer &buffer, const Layout &layout) {
+  const auto *ptr_type =
+      TVM_TYPE_AS(buffer->data->type_annotation, PointerTypeNode);
   Type new_type;
   // convert fragments to normal local buffer
   if (ptr_type->storage_scope == "local.fragment") {
@@ -53,32 +54,33 @@ static Buffer makeBufferWithLayout(const Buffer& buffer, const Layout& layout) {
   } else {
     new_var = Var(buffer->data->name_hint, new_type);
   }
-  return Buffer(new_var, buffer->dtype, layout->OutputShape(), {}, buffer->elem_offset,
-                buffer->name, buffer->data_alignment, buffer->offset_factor, buffer->buffer_type);
+  return Buffer(new_var, buffer->dtype, layout->OutputShape(), {},
+                buffer->elem_offset, buffer->name, buffer->data_alignment,
+                buffer->offset_factor, buffer->buffer_type);
 }
 
 class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
- public:
+public:
   static PrimFunc Substitute(PrimFunc f) {
     arith::Analyzer analyzer;
     LowerTileOpPass substituter(&analyzer);
     // Trace the buffer map for tvm_access_ptr
     substituter.buffer_map_.insert(f->buffer_map.begin(), f->buffer_map.end());
-    for (const auto& [_, buffer] : f->buffer_map) {
+    for (const auto &[_, buffer] : f->buffer_map) {
       substituter.buffer_data_to_buffer_.Set(buffer->data, buffer);
     }
     auto target = f->GetAttr<Target>(tvm::attr::kTarget);
     ICHECK(target.defined()) << "LowerTileOpPass: Require the target attribute";
     substituter.target_ = target.value();
-    PrimFuncNode* fptr = f.CopyOnWrite();
+    PrimFuncNode *fptr = f.CopyOnWrite();
     fptr->body = substituter.VisitStmt(f->body);
     return f;
   }
 
- private:
+private:
   using arith::IRMutatorWithAnalyzer::IRMutatorWithAnalyzer;
 
-  Stmt VisitStmt_(const BlockNode* op) final {
+  Stmt VisitStmt_(const BlockNode *op) final {
     // Record the mapping from buffer data var to buffer for later lookup
     for (auto buffer : op->alloc_buffers) {
       buffer_map_.insert({buffer->data, buffer});
@@ -91,7 +93,9 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
     }
     Map<Var, Layout> vmap;
     if (op->annotations.count(attr::kLayoutMap)) {
-      auto layout_map = op->annotations.at(attr::kLayoutMap).as<Map<Buffer, Layout>>().value();
+      auto layout_map = op->annotations.at(attr::kLayoutMap)
+                            .as<Map<Buffer, Layout>>()
+                            .value();
       for (auto [buffer, layout] : layout_map) {
         buffer_remap_.Set(buffer, makeBufferWithLayout(buffer, layout));
         layout_map_.Set(buffer, layout);
@@ -105,7 +109,8 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
         block_ptr->alloc_buffers.Set(i, buffer_remap_[buffer]);
       }
     }
-    for (const auto& buffer : workspaces_) block_ptr->alloc_buffers.push_back(buffer);
+    for (const auto &buffer : workspaces_)
+      block_ptr->alloc_buffers.push_back(buffer);
     workspaces_.clear();
     block_ptr->annotations.erase(attr::kLayoutMap);
     return block;
@@ -113,18 +118,19 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
 
   int CheckAndGetBufferRowSize(Buffer buffer) {
     CHECK(buffer->shape.size() >= 2)
-        << "The dimension of Buffer \"" << buffer->name << "\" with shape " << buffer->shape
-        << " should be at least 2";
+        << "The dimension of Buffer \"" << buffer->name << "\" with shape "
+        << buffer->shape << " should be at least 2";
 
     auto dim = buffer->shape.size();
     auto buffer_row_size = buffer->shape[dim - 1].as<IntImmNode>()->value;
     return buffer_row_size;
   }
 
-  PrimExpr HandleAccessPtrAndOffset(PrimExpr access_ptr, Optional<PrimExpr> offset = NullOpt,
+  PrimExpr HandleAccessPtrAndOffset(PrimExpr access_ptr,
+                                    Optional<PrimExpr> offset = NullOpt,
                                     DataType dtype = DataType::Int(32)) {
-    // The 2th arg of T.tvm_access_ptr call is offset, we set it to 0 and accumulate it to
-    // smem_offset
+    // The 2th arg of T.tvm_access_ptr call is offset, we set it to 0 and
+    // accumulate it to smem_offset
     CHECK(access_ptr->IsInstance<CallNode>())
         << "Invalid access ptr for permuted layout: " << access_ptr;
     auto access_ptr_call = Downcast<Call>(access_ptr);
@@ -136,8 +142,10 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
       Array<PrimExpr> shape = load->buffer->shape;
 
       CHECK_EQ(indices.size(), shape.size())
-          << "Indices size and shape size must match for general N-dimensional buffer "
-          << "but got indices size: " << indices.size() << " and shape size: " << shape.size();
+          << "Indices size and shape size must match for general N-dimensional "
+             "buffer "
+          << "but got indices size: " << indices.size()
+          << " and shape size: " << shape.size();
 
       PrimExpr elem_offset = 0;
       PrimExpr stride = 1;
@@ -147,13 +155,16 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
         stride *= shape[i];
       }
 
-      PrimExpr smem_offset = elem_offset + (offset.defined() ? offset.value() : 0);
+      PrimExpr smem_offset =
+          elem_offset + (offset.defined() ? offset.value() : 0);
 
       auto new_buffer = buffer_remap_[load->buffer];
 
-      auto buffer_map_iter = buffer_map_.find(Downcast<Var>(load->buffer->data));
+      auto buffer_map_iter =
+          buffer_map_.find(Downcast<Var>(load->buffer->data));
       CHECK(buffer_map_iter != buffer_map_.end())
-          << "The buffer corresponding to data Var " << access_ptr_call->args[0] << " is not found";
+          << "The buffer corresponding to data Var " << access_ptr_call->args[0]
+          << " is not found";
 
       int buffer_row_size = CheckAndGetBufferRowSize(buffer_map_iter->second);
       (void)buffer_row_size;
@@ -163,11 +174,13 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
       PrimExpr remaining_offset = smem_offset;
 
       for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
-        multi_dim_indices.insert(multi_dim_indices.begin(), floormod(remaining_offset, shape[i]));
+        multi_dim_indices.insert(multi_dim_indices.begin(),
+                                 floormod(remaining_offset, shape[i]));
         remaining_offset = floordiv(remaining_offset, shape[i]);
       }
 
-      auto forward_indices = layout_map_[load->buffer]->Forward(multi_dim_indices);
+      auto forward_indices =
+          layout_map_[load->buffer]->Forward(multi_dim_indices);
       PrimExpr new_offset = 0;
       PrimExpr stride_offset = 1;
       for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
@@ -191,8 +204,9 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
     return access_ptr_call;
   }
 
-  PrimExpr VisitExpr_(const tir::CallNode* op) final {
-    if (!op->op.same_as(builtin::ptx_ldmatrix()) && !op->op.same_as(builtin::mma_store())) {
+  PrimExpr VisitExpr_(const tir::CallNode *op) final {
+    if (!op->op.same_as(builtin::ptx_ldmatrix()) &&
+        !op->op.same_as(builtin::mma_store())) {
       return Downcast<Call>(IRMutatorWithAnalyzer::VisitExpr_(op));
     } else {
       is_ptx_ = true;
@@ -212,15 +226,18 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
       BufferLoad load = Downcast<BufferLoad>(address_of_call->args[0]);
 
       if (buffer_remap_.count(load->buffer)) {
-        auto new_access_ptr = HandleAccessPtrAndOffset(access_ptr, smem_offset, call->dtype);
+        auto new_access_ptr =
+            HandleAccessPtrAndOffset(access_ptr, smem_offset, call->dtype);
         auto new_call = call.CopyOnWrite();
         new_call->args.Set(5, new_access_ptr);
         new_call->args.Set(6, IntImm(smem_offset->dtype, 0));
       }
     } else if (call->op.same_as(builtin::mma_store())) {
-      // because we will directly store result to Buffer instead of calling mma_store now
+      // because we will directly store result to Buffer instead of calling
+      // mma_store now
       auto access_ptr = call->args[2];
-      auto new_access_ptr = HandleAccessPtrAndOffset(access_ptr, NullOpt, call->dtype);
+      auto new_access_ptr =
+          HandleAccessPtrAndOffset(access_ptr, NullOpt, call->dtype);
       auto new_call = call.CopyOnWrite();
       new_call->args.Set(2, new_access_ptr);
     } else {
@@ -230,7 +247,7 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
     return call;
   }
 
-  PrimExpr VisitExpr_(const BufferLoadNode* op) final {
+  PrimExpr VisitExpr_(const BufferLoadNode *op) final {
     auto load = Downcast<BufferLoad>(IRMutatorWithAnalyzer::VisitExpr_(op));
     if (is_ptx_) {
       return load;
@@ -243,7 +260,7 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
     return load;
   }
 
-  Stmt VisitStmt_(const BufferStoreNode* op) final {
+  Stmt VisitStmt_(const BufferStoreNode *op) final {
     auto store = Downcast<BufferStore>(IRMutatorWithAnalyzer::VisitStmt_(op));
     if (buffer_remap_.count(store->buffer)) {
       auto new_indices = layout_map_[store->buffer]->Forward(store->indices);
@@ -253,36 +270,40 @@ class LowerTileOpPass : arith::IRMutatorWithAnalyzer {
     return store;
   }
 
-  PrimExpr VisitExpr_(const VarNode* op) final {
+  PrimExpr VisitExpr_(const VarNode *op) final {
     auto var = Downcast<Var>(IRMutatorWithAnalyzer::VisitExpr_(op));
     if (buffer_data_to_buffer_.count(var)) {
       auto buffer = buffer_data_to_buffer_[var];
-      if (buffer_remap_.count(buffer)) return buffer_remap_[buffer]->data;
+      if (buffer_remap_.count(buffer))
+        return buffer_remap_[buffer]->data;
     }
     return var;
   }
 
-  Stmt VisitStmt_(const EvaluateNode* op) final {
-    const CallNode* call = op->value.as<CallNode>();
+  Stmt VisitStmt_(const EvaluateNode *op) final {
+    const CallNode *call = op->value.as<CallNode>();
     // Do not analysis the call node to the global function.
     if (call && call->op.as<GlobalVarNode>())
       return Downcast<Evaluate>(IRMutatorWithAnalyzer::VisitStmt_(op));
 
     auto tile_op = ParseOperator(GetRef<Stmt>(op), buffer_data_to_buffer_);
-    if (tile_op == nullptr) return IRMutatorWithAnalyzer::VisitStmt_(op);
+    if (tile_op == nullptr)
+      return IRMutatorWithAnalyzer::VisitStmt_(op);
     AddWorkspaceCallback callback = [this](int num_elem, DataType dtype) {
-      auto workspace = decl_buffer({PrimExpr(num_elem)}, dtype, "workspace", "shared.dyn");
+      auto workspace =
+          decl_buffer({PrimExpr(num_elem)}, dtype, "workspace", "shared.dyn");
       workspaces_.push_back(workspace);
-      return workspace.access_ptr(2);  // write
+      return workspace.access_ptr(2); // write
     };
 
-    auto lowered = tile_op->Lower(
-        LowerArgs{target_, thread_block_size_, thread_var_, callback, layout_map_, buffer_remap_},
-        analyzer_);
+    auto lowered =
+        tile_op->Lower(LowerArgs{target_, thread_block_size_, thread_var_,
+                                 callback, layout_map_, buffer_remap_},
+                       analyzer_);
     return IRMutatorWithAnalyzer::VisitStmt(lowered);
   }
 
-  Stmt VisitStmt_(const AttrStmtNode* op) final {
+  Stmt VisitStmt_(const AttrStmtNode *op) final {
     if (op->attr_key == tir::attr::thread_extent) {
       IterVar iv = Downcast<IterVar>(op->node);
       ICHECK_NE(iv->thread_tag.length(), 0U);
@@ -321,7 +342,7 @@ tvm::transform::Pass LowerTileOp() {
 }
 
 TVM_REGISTER_GLOBAL("tl.transform.LowerTileOp").set_body_typed(LowerTileOp);
-}  // namespace transform
+} // namespace transform
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

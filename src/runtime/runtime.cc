@@ -17,12 +17,12 @@ namespace tl {
 
 using namespace runtime;
 
-template <typename T>
-static std::string ArrayToStr(const T* ptr, size_t n) {
+template <typename T> static std::string ArrayToStr(const T *ptr, size_t n) {
   std::stringstream ss;
   ss << "[";
   for (size_t i = 0; i < n; i++) {
-    if (i > 0) ss << ", ";
+    if (i > 0)
+      ss << ", ";
     ss << ptr[i];
   }
   ss << "]";
@@ -30,10 +30,10 @@ static std::string ArrayToStr(const T* ptr, size_t n) {
 }
 
 struct TensorMapArgs {
-  CUtensorMap* map;
+  CUtensorMap *map;
   CUtensorMapDataType type;
   cuuint32_t tensorRank;
-  void* globalAddress;
+  void *globalAddress;
   cuuint64_t globalDim[5], globalStride[5];
   cuuint32_t boxDim[5], elementStrides[5];
   CUtensorMapInterleave interleave;
@@ -45,8 +45,9 @@ struct TensorMapArgs {
     TensorMapArgs T;
     int idx = 0;
     ICHECK(args.num_args >= 8);
-    T.map = reinterpret_cast<CUtensorMap*>(static_cast<void*>(args[idx++]));
-    T.type = static_cast<CUtensorMapDataType>(static_cast<int64_t>(args[idx++]));
+    T.map = reinterpret_cast<CUtensorMap *>(static_cast<void *>(args[idx++]));
+    T.type =
+        static_cast<CUtensorMapDataType>(static_cast<int64_t>(args[idx++]));
     T.tensorRank = static_cast<cuuint32_t>(static_cast<int64_t>(args[idx++]));
     T.globalAddress = args[idx++];
     ICHECK(T.tensorRank >= 1 && T.tensorRank <= 5);
@@ -63,10 +64,14 @@ struct TensorMapArgs {
     for (size_t i = 0; i < T.tensorRank; i++) {
       T.elementStrides[i] = static_cast<cuuint64_t>(args[idx++]);
     }
-    T.interleave = static_cast<CUtensorMapInterleave>(static_cast<int64_t>(args[idx++]));
-    T.swizzle = static_cast<CUtensorMapSwizzle>(static_cast<int64_t>(args[idx++]));
-    T.l2Promotion = static_cast<CUtensorMapL2promotion>(static_cast<int64_t>(args[idx++]));
-    T.oobFill = static_cast<CUtensorMapFloatOOBfill>(static_cast<int64_t>(args[idx++]));
+    T.interleave =
+        static_cast<CUtensorMapInterleave>(static_cast<int64_t>(args[idx++]));
+    T.swizzle =
+        static_cast<CUtensorMapSwizzle>(static_cast<int64_t>(args[idx++]));
+    T.l2Promotion =
+        static_cast<CUtensorMapL2promotion>(static_cast<int64_t>(args[idx++]));
+    T.oobFill =
+        static_cast<CUtensorMapFloatOOBfill>(static_cast<int64_t>(args[idx++]));
     return T;
   }
 
@@ -79,7 +84,8 @@ struct TensorMapArgs {
        << "globalDim      " << ArrayToStr(globalDim, tensorRank) << std::endl
        << "globalStrides  " << ArrayToStr(globalStride, tensorRank) << std::endl
        << "boxDim         " << ArrayToStr(boxDim, tensorRank) << std::endl
-       << "elementStrides " << ArrayToStr(elementStrides, tensorRank) << std::endl
+       << "elementStrides " << ArrayToStr(elementStrides, tensorRank)
+       << std::endl
        << "interleave     " << interleave << std::endl
        << "swizzle        " << swizzle << std::endl
        << "l2Promotion    " << l2Promotion << std::endl
@@ -89,23 +95,26 @@ struct TensorMapArgs {
 };
 
 // set device api
-TVM_REGISTER_GLOBAL(tvm_tensormap_create_tiled).set_body([](TVMArgs args, TVMRetValue* ret) {
-  TensorMapArgs T = TensorMapArgs::Extract(args);
-  CUresult result = cuTensorMapEncodeTiled(
-      T.map, T.type, T.tensorRank, T.globalAddress, T.globalDim, T.globalStride + 1, T.boxDim,
-      T.elementStrides, T.interleave, T.swizzle, T.l2Promotion, T.oobFill);
-  if (result != CUDA_SUCCESS) {
-    LOG_FATAL << "Failed to initialize the TMA descriptor " << result << std::endl
-              << T.ToDebugString();
-  }
-  *ret = static_cast<int>(result);
-});
+TVM_REGISTER_GLOBAL(tvm_tensormap_create_tiled)
+    .set_body([](TVMArgs args, TVMRetValue *ret) {
+      TensorMapArgs T = TensorMapArgs::Extract(args);
+      CUresult result = cuTensorMapEncodeTiled(
+          T.map, T.type, T.tensorRank, T.globalAddress, T.globalDim,
+          T.globalStride + 1, T.boxDim, T.elementStrides, T.interleave,
+          T.swizzle, T.l2Promotion, T.oobFill);
+      if (result != CUDA_SUCCESS) {
+        LOG_FATAL << "Failed to initialize the TMA descriptor " << result
+                  << std::endl
+                  << T.ToDebugString();
+      }
+      *ret = static_cast<int>(result);
+    });
 
 struct TensorMapIm2ColArgs {
-  CUtensorMap* map;
+  CUtensorMap *map;
   CUtensorMapDataType type;
   cuuint32_t tensorRank;
-  void* globalAddress;
+  void *globalAddress;
   cuuint64_t globalDim[5], globalStride[5];
   cuuint32_t elementStrides[5];
   int pixelBoxLowerCorner[3], pixelBoxUpperCorner[3];
@@ -119,8 +128,9 @@ struct TensorMapIm2ColArgs {
     TensorMapIm2ColArgs T;
     int idx = 0;
     ICHECK(args.num_args >= 8);
-    T.map = reinterpret_cast<CUtensorMap*>(static_cast<void*>(args[idx++]));
-    T.type = static_cast<CUtensorMapDataType>(static_cast<int64_t>(args[idx++]));
+    T.map = reinterpret_cast<CUtensorMap *>(static_cast<void *>(args[idx++]));
+    T.type =
+        static_cast<CUtensorMapDataType>(static_cast<int64_t>(args[idx++]));
     T.tensorRank = static_cast<cuuint32_t>(static_cast<int64_t>(args[idx++]));
     T.globalAddress = args[idx++];
     ICHECK(T.tensorRank >= 3 && T.tensorRank <= 5);
@@ -142,10 +152,14 @@ struct TensorMapIm2ColArgs {
     }
     T.smem_box_pixel = static_cast<cuuint64_t>(args[idx++]);
     T.smem_box_channel = static_cast<cuuint64_t>(args[idx++]);
-    T.interleave = static_cast<CUtensorMapInterleave>(static_cast<int64_t>(args[idx++]));
-    T.swizzle = static_cast<CUtensorMapSwizzle>(static_cast<int64_t>(args[idx++]));
-    T.l2Promotion = static_cast<CUtensorMapL2promotion>(static_cast<int64_t>(args[idx++]));
-    T.oobFill = static_cast<CUtensorMapFloatOOBfill>(static_cast<int64_t>(args[idx++]));
+    T.interleave =
+        static_cast<CUtensorMapInterleave>(static_cast<int64_t>(args[idx++]));
+    T.swizzle =
+        static_cast<CUtensorMapSwizzle>(static_cast<int64_t>(args[idx++]));
+    T.l2Promotion =
+        static_cast<CUtensorMapL2promotion>(static_cast<int64_t>(args[idx++]));
+    T.oobFill =
+        static_cast<CUtensorMapFloatOOBfill>(static_cast<int64_t>(args[idx++]));
     return T;
   }
 
@@ -159,9 +173,12 @@ struct TensorMapIm2ColArgs {
        << "globalStrides  " << ArrayToStr(globalStride, tensorRank) << std::endl
        << "smem_box_pixel " << smem_box_pixel << std::endl
        << "smem_box_channel " << smem_box_channel << std::endl
-       << "pixelBoxLowerCorner  " << ArrayToStr(pixelBoxLowerCorner, tensorRank - 2) << std::endl
-       << "pixelBoxUpperCorner  " << ArrayToStr(pixelBoxUpperCorner, tensorRank - 2) << std::endl
-       << "elementStrides " << ArrayToStr(elementStrides, tensorRank) << std::endl
+       << "pixelBoxLowerCorner  "
+       << ArrayToStr(pixelBoxLowerCorner, tensorRank - 2) << std::endl
+       << "pixelBoxUpperCorner  "
+       << ArrayToStr(pixelBoxUpperCorner, tensorRank - 2) << std::endl
+       << "elementStrides " << ArrayToStr(elementStrides, tensorRank)
+       << std::endl
        << "interleave     " << interleave << std::endl
        << "swizzle        " << swizzle << std::endl
        << "l2Promotion    " << l2Promotion << std::endl
@@ -170,18 +187,21 @@ struct TensorMapIm2ColArgs {
   }
 };
 
-TVM_REGISTER_GLOBAL(tvm_tensormap_create_im2col).set_body([](TVMArgs args, TVMRetValue* ret) {
-  TensorMapIm2ColArgs T = TensorMapIm2ColArgs::Extract(args);
-  CUresult result = cuTensorMapEncodeIm2col(
-      T.map, T.type, T.tensorRank, T.globalAddress, T.globalDim, T.globalStride + 1,
-      T.pixelBoxLowerCorner, T.pixelBoxUpperCorner, T.smem_box_channel, T.smem_box_pixel,
-      T.elementStrides, T.interleave, T.swizzle, T.l2Promotion, T.oobFill);
-  if (result != CUDA_SUCCESS) {
-    LOG_FATAL << "Failed to initialize the TMA descriptor " << result << std::endl
-              << T.ToDebugString();
-  }
-  *ret = static_cast<int>(result);
-});
+TVM_REGISTER_GLOBAL(tvm_tensormap_create_im2col)
+    .set_body([](TVMArgs args, TVMRetValue *ret) {
+      TensorMapIm2ColArgs T = TensorMapIm2ColArgs::Extract(args);
+      CUresult result = cuTensorMapEncodeIm2col(
+          T.map, T.type, T.tensorRank, T.globalAddress, T.globalDim,
+          T.globalStride + 1, T.pixelBoxLowerCorner, T.pixelBoxUpperCorner,
+          T.smem_box_channel, T.smem_box_pixel, T.elementStrides, T.interleave,
+          T.swizzle, T.l2Promotion, T.oobFill);
+      if (result != CUDA_SUCCESS) {
+        LOG_FATAL << "Failed to initialize the TMA descriptor " << result
+                  << std::endl
+                  << T.ToDebugString();
+      }
+      *ret = static_cast<int>(result);
+    });
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm

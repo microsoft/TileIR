@@ -37,7 +37,7 @@ struct TMAIm2ColDesc {
   size_t rank;
   int data_type;
   Array<PrimExpr> global_shape, global_stride, elem_stride; // rank
-  Array<PrimExpr> lower_corner, upper_corner; // rank - 2
+  Array<PrimExpr> lower_corner, upper_corner;               // rank - 2
   PrimExpr global_addr;
   int smem_box_pixel, smem_box_channel;
   int swizzle;
@@ -49,18 +49,18 @@ struct TMAIm2ColDesc {
 };
 
 class Conv2DIm2ColOp : public Operator {
- public:
+public:
   Conv2DIm2ColOp(Array<PrimExpr> args, BufferMap vmap);
-  Stmt Lower(const LowerArgs& T, arith::Analyzer* analyzer) const final;
-  static const Op& Get();
+  Stmt Lower(const LowerArgs &T, arith::Analyzer *analyzer) const final;
+  static const Op &Get();
 
- private:
+private:
   Buffer src, dst;
   int stride, padding, dilation, kernel;
   PrimExpr nhw_step, c_step;
 };
 
-}  // namespace tl
-}  // namespace tvm
+} // namespace tl
+} // namespace tvm
 
-#endif  //  TVM_TL_OP_BULK_COPY_H_
+#endif //  TVM_TL_OP_BULK_COPY_H_
