@@ -227,5 +227,3 @@ This project may contain trademarks or logos for projects, products, or services
 ## Acknowledgements
 
 We learned a lot from the [TVM](https://github.com/apache/tvm) community and would like to thank them for their contributions.
-
-This project was initiated by [yining shi](https://github.com/nox-410), and continued by [lei wang](https://github.com/LeiWang1999) and [yu cheng](https://github.com/chengyupku). It was completed under the guidance of [yuqing xia](https://github.com/xiayuqing0622), [lingxiao ma](https://github.com/xysmlx) and [jilong xue](https://github.com/jlxue) from [MSRA System Research Group](https://www.microsoft.com/en-us/research/group/systems-and-networking-research-group-asia/).
