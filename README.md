@@ -48,7 +48,7 @@ We currently provide three ways to install **TileIR** from source:
 
 ## Quick Start
 
-Below is a simple example demonstrating how to write and execute a straightforward GEMM (matrix multiplication) kernel using TileIR, followed by techniques for layout optimizations, pipelining, and L2-cache–friendly swizzling.
+Below is a simple example demonstrating how to write and execute a straightforward GEMM (matrix multiplication) kernel using TileIR, followed by techniques for layout optimizations, pipelining, and L2-cache–friendly swizzling!
 
 ### Basic GEMM Example
 
